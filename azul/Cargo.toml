@@ -54,13 +54,13 @@ image = { version = "0.20.1", default-features = false, optional = true, feature
 
 # Linux: Use webrender with freetype feature enabled
 [target.'cfg(target_os = "linux")'.dependencies]
-webrender = "0.58" # rev = "92235d1fc4ff4c4fb4e1ed709eb3136e96c786b5"
+webrender = "0.60"
 
 # Windows: Use nativefiledialog because of better Unicode support for file browsers
 # TODO: Unicode problems have been fixed upstream, update azul to tinyfiledialogs!
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 # nfd = { version = "0.0.4", path = "./nfd-0.0.4", default-features = false }
-webrender = { version = "0.58", default-features = false }
+webrender = { version = "0.60", default-features = false }
 
 [features]
 # The "SVG" feature only enables the creation of shapes / polygons, etc. not the actual parsing

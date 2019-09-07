@@ -11,4 +11,4 @@ members = [
 
 # Macos: Need the latest version to have run_return implemented
 [patch.crates-io]
-winit = { git = "https://github.com/rust-windowing/winit", rev = "1e7376847b4f65e4e888aa9768329550c6d26a48" }
+winit = { git = "https://github.com/rust-windowing/winit" }
