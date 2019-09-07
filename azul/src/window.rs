@@ -467,7 +467,7 @@ impl<T> Window<T> {
         let gl_window = create_gl_window_with_shared(window, &events_loop, shared_context)?;
 
         // Hide the window until the first draw (prevents flash on startup)
-        gl_window.window().set_visible(true);
+        gl_window.window().set_visible(false);
 
         let (hidpi_factor, winit_hidpi_factor) =
             get_hidpi_factor(&gl_window.window(), &events_loop);

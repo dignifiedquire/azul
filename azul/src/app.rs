@@ -355,7 +355,7 @@ impl<T: 'static> App<T> {
                     &mut awakened_tasks,
                     &mut last_style_reload,
                 );
-                next_frame_time = Instant::now() + Duration::from_nanos(16666667);
+                next_frame_time = Instant::now() + Duration::from_nanos(16_666_667);
                 events_buffer.clear();
                 action
             } else {
@@ -409,6 +409,9 @@ impl<T: 'static> App<T> {
         let mut closed_windows = Vec::<WindowId>::new();
         let mut frame_was_resize = false;
         let mut single_window_results = Vec::with_capacity(self.windows.len());
+        // if !mapped_events.is_empty() {
+        //     println!("handling events {:?}", &mapped_events);
+        // }
 
         for (current_window_id, mut window) in self.windows.iter_mut() {
             // Only process the events belong to this window ID...
@@ -439,10 +442,9 @@ impl<T: 'static> App<T> {
 
             if single_window_result.window_should_close {
                 closed_windows.push(*current_window_id);
-                return Action::Stop;
+            } else {
+                single_window_results.push(single_window_result);
             }
-
-            single_window_results.push(single_window_result);
         }
 
         // Close windows if necessary
@@ -452,6 +454,11 @@ impl<T: 'static> App<T> {
             self.windows.remove(&closed_window_id);
             self.window_states.remove(&closed_window_id);
         });
+
+        // Exit the app when all windows are closed.
+        if self.windows.is_empty() {
+            return Action::Stop;
+        }
 
         #[cfg(debug_assertions)]
         let (css_has_reloaded, css_has_error) =
@@ -540,16 +547,12 @@ impl<T: 'static> App<T> {
         // If there is a re-render necessary, re-render *all* windows
         if should_rerender_all_windows || should_redraw_timers_or_tasks {
             for window in self.windows.values_mut() {
-                // TODO: For some reason this function has to be called twice in order
-                // to actually update the screen. For some reason the first swap_buffers() has
-                // no effect (winit bug?)
                 render_inner(
                     window,
                     &mut self.fake_display,
                     Transaction::new(),
                     self.config.background_color,
                 );
-                // render_inner(window, &mut self.fake_display, Transaction::new(), self.config.background_color);
             }
             clean_up_unused_opengl_textures(
                 self.fake_display
@@ -719,6 +722,7 @@ struct SingleWindowContentResult {
     callbacks_update_screen: UpdateScreen,
     hit_test_results: Option<Vec<HitTestItem>>,
     new_focus_target: Option<FocusTarget>,
+    should_rerender: bool,
 }
 
 impl SingleWindowContentResult {
@@ -728,6 +732,7 @@ impl SingleWindowContentResult {
             || self.needs_relayout_tasks
             || self.needs_relayout_refresh
             || self.callbacks_update_screen == Redraw
+            || self.should_rerender
     }
 
     pub fn should_rerender(&self) -> bool {
@@ -762,6 +767,9 @@ fn hit_test_single_window<T>(
         should_scroll_render: false,
         needs_relayout_tasks: *(awakened_tasks.get(window_id).ok_or(WindowIndexError)?),
         needs_relayout_refresh: false,
+        should_rerender: events
+            .iter()
+            .any(|event| event == &WindowEvent::RedrawRequested),
         callbacks_update_screen: DontRedraw,
         hit_test_results: None,
         new_focus_target: None,
