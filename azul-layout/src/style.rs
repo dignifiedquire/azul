@@ -20,9 +20,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use azul_css::PixelValue;
 use crate::geometry::{Offsets, Size};
 use crate::number::Number;
+use azul_css::PixelValue;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum AlignItems {

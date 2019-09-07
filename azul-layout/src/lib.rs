@@ -23,6 +23,7 @@
 extern crate azul_core;
 extern crate azul_css;
 
+use crate::style::Style;
 use azul_core::{
     dom::NodeId,
     id_tree::{NodeDataContainer, NodeHierarchy},
@@ -30,7 +31,6 @@ use azul_core::{
 };
 use azul_css::LayoutRect;
 use std::collections::BTreeMap;
-use crate::style::Style;
 
 mod algo;
 mod geometry;

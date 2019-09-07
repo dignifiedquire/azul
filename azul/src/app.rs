@@ -11,8 +11,10 @@ use azul_css::{ColorU, LayoutPoint};
 #[cfg(not(test))]
 use azul_css::{Css, HotReloadHandler};
 use gleam::gl::{self, GLuint, Gl};
-use glium::glutin::event::WindowEvent;
-use glium::glutin::platform::desktop::EventLoopExtDesktop;
+use glium::glutin::{
+    event::{Event, StartCause, WindowEvent},
+    event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget},
+};
 use log::LevelFilter;
 use std::{collections::BTreeMap, rc::Rc, time::Instant};
 #[cfg(not(test))]
@@ -72,6 +74,7 @@ pub struct App<T> {
     /// The actual renderer of this application
     #[cfg(not(test))]
     fake_display: FakeDisplay,
+    event_loop: Option<EventLoop<()>>,
     #[cfg(test)]
     render_api: FakeRenderApi,
 }
@@ -182,6 +185,7 @@ impl<T: Layout> App<T> {
                 app_state: AppState::new(initial_data),
                 config: app_config,
                 layout_callback: T::layout,
+                event_loop: Some(EventLoop::new()),
                 fake_display,
             })
         }
@@ -199,8 +203,12 @@ impl<T: Layout> App<T> {
         }
     }
 }
+enum Action {
+    Stop,
+    Continue,
+}
 
-impl<T> App<T> {
+impl<T: 'static> App<T> {
     /// Creates a new window
     #[cfg(not(test))]
     pub fn create_window(
@@ -211,7 +219,7 @@ impl<T> App<T> {
         Window::new(
             &mut self.fake_display.render_api,
             self.fake_display.hidden_display.gl_window().context(),
-            &mut self.fake_display.hidden_events_loop,
+            self.event_loop.as_mut().unwrap(),
             options,
             css,
             self.config.background_color,
@@ -228,7 +236,7 @@ impl<T> App<T> {
         Window::new_hot_reload(
             &mut self.fake_display.render_api,
             self.fake_display.hidden_display.gl_window().context(),
-            &mut self.fake_display.hidden_events_loop,
+            self.event_loop.as_mut().unwrap(),
             options,
             css_loader,
             self.config.background_color,
@@ -280,18 +288,13 @@ impl<T> App<T> {
     /// println!("username: {:?}, password: {:?}", username, password);
     /// ```
     #[cfg(not(test))]
-    pub fn run(mut self, window: Window<T>) -> Result<T, RuntimeError> {
+    pub fn run(mut self, window: Window<T>) -> Result<(), RuntimeError> {
         // Apps need to have at least one window open
         self.add_window(window);
         self.run_inner()?;
 
-        // NOTE: This is necessary because otherwise, the Arc::try_unwrap would fail,
-        // since one Arc is still owned by the app_state.tasks structure
-        //
-        // See https://github.com/maps4print/azul/issues/24#issuecomment-429737273
-        std::mem::drop(self.app_state.tasks);
-
-        Ok(self.app_state.data)
+        // TODO: bring back return user data
+        Ok(())
     }
 
     /// See `AppState::add_task`.
@@ -309,13 +312,8 @@ impl<T> App<T> {
     }
 
     #[cfg(not(test))]
-    fn run_inner(&mut self) -> Result<(), RuntimeError> {
-        use crate::ui_state::{ui_state_from_app_state, ui_state_from_dom};
-        use azul_core::app::RuntimeError::*;
-        use glium::glutin::{
-            event::Event, event_loop::ControlFlow, window::WindowId as GliumWindowId,
-        };
-        use std::{thread, time::Duration};
+    fn run_inner(mut self) -> Result<(), RuntimeError> {
+        use std::time::Duration;
 
         // Initialize UI state cache
         let mut ui_state_cache = initialize_ui_state_cache(
@@ -330,223 +328,260 @@ impl<T> App<T> {
             .map(|window_id| (*window_id, false))
             .collect();
 
-        #[cfg(debug_assertions)]
         let mut last_style_reload = Instant::now();
-        while !self.windows.is_empty() {
-            let time_start = Instant::now();
+        let event_loop = self.event_loop.take().expect("missing event loop");
 
-            let glium_window_id_to_window_id = self
-                .windows
-                .iter()
-                .map(|(window_id, window)| {
-                    let id = window.display.gl_window().window().id();
-                    (id, *window_id)
-                })
-                .collect::<BTreeMap<GliumWindowId, WindowId>>();
+        let mut events_buffer = Vec::new();
+        let mut next_frame_time = Instant::now();
 
-            let mut events = BTreeMap::new();
-
-            // FIXME: probably should use `run` instead
-            // See warnings at https://docs.rs/winit/0.20.0-alpha3/winit/platform/desktop/trait.EventLoopExtDesktop.html
-            self.fake_display.hidden_events_loop.run_return(|e, _, cf| {
-                match e {
-                    // Filter out all events that are uninteresting or unnecessary
-                    // Event::WindowEvent { event: WindowEvent::Refresh, .. } => { },
-                    Event::WindowEvent { window_id, event } => {
-                        if let Some(wid) = glium_window_id_to_window_id.get(&window_id) {
-                            events.entry(wid).or_insert_with(|| Vec::new()).push(event);
-                            *cf = ControlFlow::Exit;
-                        }
-                    }
-                    _ => *cf = ControlFlow::Wait,
+        event_loop.run(move |event, event_loop, cf| {
+            let run_callback = match event {
+                Event::NewEvents(cause) => match cause {
+                    StartCause::ResumeTimeReached { .. } | StartCause::Init => true,
+                    _ => false,
+                },
+                _ => {
+                    events_buffer.push(event);
+                    false
                 }
-            });
-            let mut closed_windows = Vec::<WindowId>::new();
-            let mut frame_was_resize = false;
-            let mut single_window_results = Vec::with_capacity(self.windows.len());
+            };
 
-            for (current_window_id, mut window) in self.windows.iter_mut() {
-                // Only process the events belong to this window ID...
-                let window_events: Vec<WindowEvent> =
-                    events.get(current_window_id).cloned().unwrap_or_default();
-
-                let single_window_result = hit_test_single_window(
-                    &window_events,
-                    &current_window_id,
-                    &mut window,
-                    self.window_states
-                        .get_mut(current_window_id)
-                        .ok_or(WindowIndexError)
-                        .expect("do better"),
-                    &mut self.app_state,
-                    &mut self.fake_display,
+            let action = if run_callback {
+                let action = self.event_loop_callback(
+                    &events_buffer,
+                    event_loop,
                     &mut ui_state_cache,
+                    &mut ui_description_cache,
                     &mut awakened_tasks,
-                )
-                .expect("do better");
-
-                if single_window_result.needs_relayout_resize {
-                    frame_was_resize = true;
-                }
-
-                if single_window_result.window_should_close {
-                    closed_windows.push(*current_window_id);
-
-                    // TODO: Currently there is no way to return from the main event loop
-                    // i.e. the windows aren't actually getting closed
-                    // This is a hack, so that windows currently close properly
-                    return Ok(());
-                }
-
-                single_window_results.push(single_window_result);
-            }
-
-            // Close windows if necessary
-            closed_windows.into_iter().for_each(|closed_window_id| {
-                ui_state_cache.remove(&closed_window_id);
-                ui_description_cache.remove(&closed_window_id);
-                self.windows.remove(&closed_window_id);
-                self.window_states.remove(&closed_window_id);
-            });
-
-            #[cfg(debug_assertions)]
-            let (css_has_reloaded, css_has_error) =
-                match hot_reload_css(&mut self.windows, &mut last_style_reload, false) {
-                    Ok(has_reloaded) => (has_reloaded, None),
-                    Err(css_error) => (true, Some(css_error)),
-                };
-
-            #[cfg(not(debug_assertions))]
-            let css_has_error: Option<String> = None;
-
-            #[cfg(not(debug_assertions))]
-            let css_has_reloaded = false;
-
-            let should_relayout_all_windows = css_has_reloaded
-                || single_window_results
-                    .iter()
-                    .any(|res| res.should_relayout());
-            let should_rerender_all_windows = should_relayout_all_windows
-                || single_window_results
-                    .iter()
-                    .any(|res| res.should_rerender());
-
-            let should_redraw_timers = app_state_run_all_timers(&mut self.app_state);
-            let should_redraw_tasks = app_state_clean_up_finished_tasks(&mut self.app_state);
-            let should_redraw_timers_or_tasks = [should_redraw_timers, should_redraw_tasks]
-                .into_iter()
-                .any(|e| *e == Redraw);
-
-            // If there is a relayout necessary, re-layout *all* windows!
-            if should_relayout_all_windows || should_redraw_timers_or_tasks {
-                for (current_window_id, mut window) in self.windows.iter_mut() {
-                    let full_window_state = self.window_states.get_mut(current_window_id).unwrap();
-
-                    // Call the Layout::layout() fn, get the DOM
-                    let mut rendered_dom = match &css_has_error {
-                        None => ui_state_from_app_state(
-                            &mut self.app_state,
-                            current_window_id,
-                            None,
-                            self.layout_callback,
-                        )
-                        .expect("do better"),
-                        Some(s) => {
-                            println!("{}", s);
-                            ui_state_from_dom(
-                                Dom::label(s.clone()).with_class("__azul_css_error"),
-                                None,
-                            )
-                        }
-                    };
-
-                    // Since this is the root DOM of the window, set the DomID to 0
-                    rendered_dom.dom_id = DomId::ROOT_ID;
-
-                    let mut ui_state_map = BTreeMap::new();
-                    ui_state_map.insert(rendered_dom.dom_id.clone(), rendered_dom);
-                    *ui_state_cache
-                        .get_mut(current_window_id)
-                        .ok_or(WindowIndexError)
-                        .expect("do better") = ui_state_map;
-
-                    relayout_single_window(
-                        &current_window_id,
-                        &mut window,
-                        full_window_state,
-                        &mut self.app_state,
-                        &mut self.fake_display,
-                        &mut ui_state_cache,
-                        &mut ui_description_cache,
-                        &mut awakened_tasks,
-                    )
-                    .expect("do better")
-                }
-            }
-
-            // TODO: For some reason, the window state and the full window state get out of sync
-            for (window_id, full_window_state) in &self.window_states {
-                self.windows
-                    .get_mut(&window_id)
-                    .ok_or(WindowIndexError)
-                    .expect("do better")
-                    .state = crate::window::full_window_state_to_window_state(full_window_state);
-            }
-
-            // If there is a re-render necessary, re-render *all* windows
-            if should_rerender_all_windows || should_redraw_timers_or_tasks {
-                for window in self.windows.values_mut() {
-                    // TODO: For some reason this function has to be called twice in order
-                    // to actually update the screen. For some reason the first swap_buffers() has
-                    // no effect (winit bug?)
-                    render_inner(
-                        window,
-                        &mut self.fake_display,
-                        Transaction::new(),
-                        self.config.background_color,
-                    );
-                    // render_inner(window, &mut self.fake_display, Transaction::new(), self.config.background_color);
-                }
-                clean_up_unused_opengl_textures(
-                    self.fake_display
-                        .renderer
-                        .as_mut()
-                        .unwrap()
-                        .flush_pipeline_info(),
+                    &mut last_style_reload,
                 );
+                next_frame_time = Instant::now() + Duration::from_nanos(16666667);
+                events_buffer.clear();
+                action
+            } else {
+                Action::Continue
+            };
+
+            match action {
+                Action::Continue => {
+                    *cf = ControlFlow::WaitUntil(next_frame_time);
+                }
+                Action::Stop => *cf = ControlFlow::Exit,
             }
+        })
+    }
 
-            if should_relayout_all_windows || should_redraw_timers_or_tasks {
-                use crate::app_resources::garbage_collect_fonts_and_images;
+    #[cfg(not(test))]
+    fn event_loop_callback(
+        &mut self,
+        events: &Vec<Event<()>>,
+        event_loop: &EventLoopWindowTarget<()>,
+        ui_state_cache: &mut BTreeMap<WindowId, BTreeMap<DomId, UiState<T>>>,
+        ui_description_cache: &mut BTreeMap<WindowId, BTreeMap<DomId, UiDescription<T>>>,
+        awakened_tasks: &mut BTreeMap<WindowId, bool>,
+        last_style_reload: &mut Instant,
+    ) -> Action {
+        use crate::ui_state::{ui_state_from_app_state, ui_state_from_dom};
+        use azul_core::app::RuntimeError::*;
+        use glium::glutin::window::WindowId as GliumWindowId;
 
-                // Automatically remove unused fonts and images from webrender
-                // Tell the font + image GC to start a new frame
-                #[cfg(not(test))]
-                {
-                    garbage_collect_fonts_and_images(
-                        &mut self.app_state.resources,
-                        &mut self.fake_display.render_api,
-                    );
-                }
-                #[cfg(test)]
-                {
-                    garbage_collect_fonts_and_images(
-                        &mut self.app_state.resources,
-                        &mut self.fake_render_api,
-                    );
-                }
-            }
+        let glium_window_id_to_window_id = self
+            .windows
+            .iter()
+            .map(|(window_id, window)| (window.display.gl_window().window().id(), *window_id))
+            .collect::<BTreeMap<GliumWindowId, WindowId>>();
 
-            if !frame_was_resize {
-                // Wait until 16ms have passed, but not during a resize event
-                let diff = time_start.elapsed();
-                const FRAME_TIME: Duration = Duration::from_millis(16);
-                if diff < FRAME_TIME {
-                    thread::sleep(FRAME_TIME - diff);
+        let mut mapped_events = BTreeMap::new();
+        for event in events.into_iter() {
+            match event {
+                Event::WindowEvent { event, window_id } => {
+                    if let Some(wid) = glium_window_id_to_window_id.get(&window_id) {
+                        mapped_events
+                            .entry(wid)
+                            .or_insert_with(|| Vec::new())
+                            .push(event.clone());
+                    }
                 }
+                _ => {}
             }
         }
-        Ok(())
+
+        let mut closed_windows = Vec::<WindowId>::new();
+        let mut frame_was_resize = false;
+        let mut single_window_results = Vec::with_capacity(self.windows.len());
+
+        for (current_window_id, mut window) in self.windows.iter_mut() {
+            // Only process the events belong to this window ID...
+            let window_events: Vec<WindowEvent> = mapped_events
+                .get(current_window_id)
+                .cloned()
+                .unwrap_or_default();
+
+            let single_window_result = hit_test_single_window(
+                &window_events,
+                &current_window_id,
+                &mut window,
+                self.window_states
+                    .get_mut(current_window_id)
+                    .ok_or(WindowIndexError)
+                    .expect("do better"),
+                &mut self.app_state,
+                &mut self.fake_display,
+                ui_state_cache,
+                awakened_tasks,
+                event_loop,
+            )
+            .expect("do better");
+
+            if single_window_result.needs_relayout_resize {
+                frame_was_resize = true;
+            }
+
+            if single_window_result.window_should_close {
+                closed_windows.push(*current_window_id);
+                return Action::Stop;
+            }
+
+            single_window_results.push(single_window_result);
+        }
+
+        // Close windows if necessary
+        closed_windows.into_iter().for_each(|closed_window_id| {
+            ui_state_cache.remove(&closed_window_id);
+            ui_description_cache.remove(&closed_window_id);
+            self.windows.remove(&closed_window_id);
+            self.window_states.remove(&closed_window_id);
+        });
+
+        #[cfg(debug_assertions)]
+        let (css_has_reloaded, css_has_error) =
+            match hot_reload_css(&mut self.windows, last_style_reload, false) {
+                Ok(has_reloaded) => (has_reloaded, None),
+                Err(css_error) => (true, Some(css_error)),
+            };
+
+        #[cfg(not(debug_assertions))]
+        let css_has_error: Option<String> = None;
+
+        #[cfg(not(debug_assertions))]
+        let css_has_reloaded = false;
+
+        let should_relayout_all_windows = css_has_reloaded
+            || single_window_results
+                .iter()
+                .any(|res| res.should_relayout());
+        let should_rerender_all_windows = should_relayout_all_windows
+            || single_window_results
+                .iter()
+                .any(|res| res.should_rerender());
+
+        let should_redraw_timers = app_state_run_all_timers(&mut self.app_state);
+        let should_redraw_tasks = app_state_clean_up_finished_tasks(&mut self.app_state);
+        let should_redraw_timers_or_tasks = [should_redraw_timers, should_redraw_tasks]
+            .into_iter()
+            .any(|e| *e == Redraw);
+
+        // If there is a relayout necessary, re-layout *all* windows!
+        if should_relayout_all_windows || should_redraw_timers_or_tasks {
+            for (current_window_id, mut window) in self.windows.iter_mut() {
+                let full_window_state = self.window_states.get_mut(current_window_id).unwrap();
+
+                // Call the Layout::layout() fn, get the DOM
+                let mut rendered_dom = match &css_has_error {
+                    None => ui_state_from_app_state(
+                        &mut self.app_state,
+                        current_window_id,
+                        None,
+                        self.layout_callback,
+                    )
+                    .expect("do better"),
+                    Some(s) => {
+                        println!("{}", s);
+                        ui_state_from_dom(
+                            Dom::label(s.clone()).with_class("__azul_css_error"),
+                            None,
+                        )
+                    }
+                };
+
+                // Since this is the root DOM of the window, set the DomID to 0
+                rendered_dom.dom_id = DomId::ROOT_ID;
+
+                let mut ui_state_map = BTreeMap::new();
+                ui_state_map.insert(rendered_dom.dom_id.clone(), rendered_dom);
+                *ui_state_cache
+                    .get_mut(current_window_id)
+                    .ok_or(WindowIndexError)
+                    .expect("do better") = ui_state_map;
+
+                relayout_single_window(
+                    &current_window_id,
+                    &mut window,
+                    full_window_state,
+                    &mut self.app_state,
+                    &mut self.fake_display,
+                    ui_state_cache,
+                    ui_description_cache,
+                    awakened_tasks,
+                )
+                .expect("do better")
+            }
+        }
+
+        // TODO: For some reason, the window state and the full window state get out of sync
+        for (window_id, full_window_state) in &self.window_states {
+            self.windows
+                .get_mut(&window_id)
+                .ok_or(WindowIndexError)
+                .expect("do better")
+                .state = crate::window::full_window_state_to_window_state(full_window_state);
+        }
+
+        // If there is a re-render necessary, re-render *all* windows
+        if should_rerender_all_windows || should_redraw_timers_or_tasks {
+            for window in self.windows.values_mut() {
+                // TODO: For some reason this function has to be called twice in order
+                // to actually update the screen. For some reason the first swap_buffers() has
+                // no effect (winit bug?)
+                render_inner(
+                    window,
+                    &mut self.fake_display,
+                    Transaction::new(),
+                    self.config.background_color,
+                );
+                // render_inner(window, &mut self.fake_display, Transaction::new(), self.config.background_color);
+            }
+            clean_up_unused_opengl_textures(
+                self.fake_display
+                    .renderer
+                    .as_mut()
+                    .unwrap()
+                    .flush_pipeline_info(),
+            );
+        }
+
+        if should_relayout_all_windows || should_redraw_timers_or_tasks {
+            use crate::app_resources::garbage_collect_fonts_and_images;
+
+            // Automatically remove unused fonts and images from webrender
+            // Tell the font + image GC to start a new frame
+            #[cfg(not(test))]
+            {
+                garbage_collect_fonts_and_images(
+                    &mut self.app_state.resources,
+                    &mut self.fake_display.render_api,
+                );
+            }
+            #[cfg(test)]
+            {
+                garbage_collect_fonts_and_images(
+                    &mut self.app_state.resources,
+                    &mut self.fake_render_api,
+                );
+            }
+        }
+
+        Action::Continue
     }
 }
 
@@ -712,12 +747,13 @@ fn hit_test_single_window<T>(
     fake_display: &mut FakeDisplay,
     ui_state_cache: &mut BTreeMap<WindowId, BTreeMap<DomId, UiState<T>>>,
     awakened_tasks: &mut BTreeMap<WindowId, bool>,
+    event_loop: &EventLoopWindowTarget<()>,
 ) -> Result<SingleWindowContentResult, RuntimeError> {
     use crate::window;
     use azul_core::app::RuntimeError::*;
 
     let (mut frame_event_info, window_should_close) =
-        window::update_window_state(full_window_state, &events);
+        window::update_window_state(full_window_state, events);
     let mut ret = SingleWindowContentResult {
         needs_rerender_hover_active: false,
         needs_relayout_hover_active: false,
@@ -838,7 +874,7 @@ fn hit_test_single_window<T>(
     window::update_from_external_window_state(
         full_window_state,
         &mut frame_event_info,
-        &fake_display.hidden_events_loop,
+        event_loop,
         &window.display.gl_window().window(),
     );
 

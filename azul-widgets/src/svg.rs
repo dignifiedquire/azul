@@ -1519,9 +1519,11 @@ impl SvgRect {
 #[cfg(feature = "svg_parsing")]
 mod svg_to_lyon {
 
+    use crate::svg::{
+        SvgLayerType, SvgLineCap, SvgLineJoin, SvgParseError, SvgStrokeOptions, SvgStyle,
+    };
     use azul_css::ColorU;
     use lyon::{math::Point, path::PathEvent};
-    use crate::svg::{SvgLayerType, SvgLineCap, SvgLineJoin, SvgParseError, SvgStrokeOptions, SvgStyle};
     use usvg::{Color, LineCap, LineJoin, NodeKind, Options, Paint, PathSegment, Stroke, Tree};
 
     pub fn parse_from<S: AsRef<str>>(

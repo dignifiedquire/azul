@@ -20,10 +20,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use azul_core::ui_solver::ResolvedOffsets;
 use crate::number::Number;
-use std::ops::Add;
 use crate::style::FlexDirection;
+use azul_core::ui_solver::ResolvedOffsets;
+use std::ops::Add;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Rect {

@@ -23,9 +23,12 @@ use glium::{
     backend::glutin::DisplayCreationError,
     debug::DebugCallbackBehavior,
     glutin::{
-        event_loop::EventLoop, monitor::MonitorHandle, window::Window as GliumWindow,
-        window::WindowBuilder as GliumWindowBuilder, Context, ContextBuilder, ContextCurrentState,
-        ContextError, CreationError, NotCurrent, PossiblyCurrent, WindowedContext,
+        event_loop::{EventLoop, EventLoopWindowTarget},
+        monitor::MonitorHandle,
+        window::Window as GliumWindow,
+        window::WindowBuilder as GliumWindowBuilder,
+        Context, ContextBuilder, ContextCurrentState, ContextError, CreationError, NotCurrent,
+        PossiblyCurrent, WindowedContext,
     },
     Display, IncompatibleOpenGl, SwapBuffersError,
 };
@@ -416,10 +419,6 @@ impl<T> Window<T> {
         // NOTE: It would be OK to use &RenderApi here, but it's better
         // to make sure that the RenderApi is currently not in use by anything else.
 
-        // NOTE: Creating a new EventLoop for the new window causes a segfault.
-        // Report this to the winit developers.
-        // let events_loop = EventLoop::new();
-
         let is_transparent_background = background_color.a != 0;
 
         let mut window = GliumWindowBuilder::new()
@@ -468,7 +467,7 @@ impl<T> Window<T> {
         let gl_window = create_gl_window_with_shared(window, &events_loop, shared_context)?;
 
         // Hide the window until the first draw (prevents flash on startup)
-        gl_window.window().set_visible(false);
+        gl_window.window().set_visible(true);
 
         let (hidpi_factor, winit_hidpi_factor) =
             get_hidpi_factor(&gl_window.window(), &events_loop);
@@ -756,7 +755,7 @@ pub(crate) fn full_window_state_to_window_state(
 pub(crate) fn update_from_external_window_state(
     window_state: &mut FullWindowState,
     frame_event_info: &FrameEventInfo,
-    events_loop: &EventLoop<()>,
+    events_loop: &EventLoopWindowTarget<()>,
     window: &GliumWindow,
 ) {
     #[cfg(target_os = "linux")]
@@ -800,9 +799,6 @@ pub(crate) struct FakeDisplay {
     /// Fake / invisible display, only used because OpenGL is tied to a display context
     /// (offscreen rendering is not supported out-of-the-box on many platforms)
     pub(crate) hidden_display: Display,
-    /// TODO: Not sure if we even need this, the events loop isn't important
-    /// for a window that is never shown
-    pub(crate) hidden_events_loop: EventLoop<()>,
     /// Stores the GL context that is shared across all windows
     pub(crate) gl_context: Rc<dyn Gl>,
 }
@@ -851,7 +847,6 @@ impl FakeDisplay {
             render_api,
             renderer: Some(renderer),
             hidden_display: display,
-            hidden_events_loop: events_loop,
             gl_context: gl,
         })
     }
@@ -1134,8 +1129,8 @@ fn get_xft_dpi() -> Option<f32> {
 
 /// Return the DPI on X11 systems
 #[cfg(target_os = "linux")]
-fn linux_get_hidpi_factor(monitor: &MonitorId, events_loop: &EventLoop) -> f32 {
-    use glium::glutin::os::unix::EventLoopExt;
+fn linux_get_hidpi_factor(monitor: &MonitorId, events_loop: &EventLoopWindowTarget<()>) -> f32 {
+    use glium::glutin::os::unix::EventLoopWindowTargetExtUnix;
     use std::env;
     use std::process::Command;
 

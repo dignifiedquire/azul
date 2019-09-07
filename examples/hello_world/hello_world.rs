@@ -28,7 +28,10 @@ impl Layout for DataModel {
 }
 
 fn main() {
-    let mut app = App::new(DataModel { counter: 0 }, AppConfig::default()).unwrap();
+    let mut cfg = AppConfig::default();
+    cfg.enable_logging = Some(log::LevelFilter::Trace);
+
+    let mut app = App::new(DataModel { counter: 0 }, cfg).unwrap();
     let window = app
         .create_window(WindowCreateOptions::default(), css::native())
         .unwrap();
