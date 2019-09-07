@@ -1,6 +1,7 @@
 use azul_css::{Css, CssDeclaration, CssProperty, CssPropertyType};
 use std::{collections::BTreeMap, fmt};
-use {
+
+use crate::{
     callbacks::{FocusTarget, HitTestItem},
     dom::{DomId, DomString, NodeData},
     id_tree::{Arena, NodeDataContainer, NodeId},
@@ -62,7 +63,7 @@ impl<T> Clone for UiDescription<T> {
 
 impl<T> Default for UiDescription<T> {
     fn default() -> Self {
-        use {dom::Dom, ui_state::ui_state_from_dom};
+        use crate::{dom::Dom, ui_state::ui_state_from_dom};
 
         let default_dom = Dom::div();
         let hovered_nodes = BTreeMap::new();
@@ -95,9 +96,9 @@ impl<T> UiDescription<T> {
         hovered_nodes: &BTreeMap<NodeId, HitTestItem>,
         is_mouse_down: bool,
     ) -> Self {
-        use ui_state::ui_state_create_tags_for_hover_nodes;
+        use crate::ui_state::ui_state_create_tags_for_hover_nodes;
 
-        let ui_description = ::style::match_dom_selectors(
+        let ui_description = crate::style::match_dom_selectors(
             ui_state,
             &style,
             focused_node,

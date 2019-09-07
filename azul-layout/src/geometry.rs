@@ -21,9 +21,9 @@
 // SOFTWARE.
 
 use azul_core::ui_solver::ResolvedOffsets;
-use number::Number;
+use crate::number::Number;
 use std::ops::Add;
-use style::FlexDirection;
+use crate::style::FlexDirection;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Rect {

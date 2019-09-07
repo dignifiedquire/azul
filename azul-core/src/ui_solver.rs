@@ -3,7 +3,8 @@ use azul_css::{
     StyleTextAlignmentHorz, StyleTextAlignmentVert, StyleTextColor,
 };
 use std::collections::BTreeMap;
-use {
+
+use crate::{
     app_resources::{FontInstanceKey, LayoutedGlyphs, ScaledWords, WordPositions, Words},
     callbacks::PipelineId,
     dom::{DomHash, ScrollTagId},

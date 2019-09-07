@@ -1,6 +1,3 @@
-use callbacks::{
-    DontRedraw, TimerCallback, TimerCallbackInfo, TimerCallbackReturn, TimerCallbackType,
-};
 use std::{
     fmt,
     hash::{Hash, Hasher},
@@ -10,6 +7,10 @@ use std::{
     },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
+};
+
+use crate::callbacks::{
+    DontRedraw, TimerCallback, TimerCallbackInfo, TimerCallbackReturn, TimerCallbackType,
 };
 
 /// Should a timer terminate or not - used to remove active timers
@@ -277,7 +278,7 @@ impl<T> Thread<T> {
     ///
     /// ```rust
     /// # extern crate azul_core;
-    /// # use azul_core::async::Thread;
+    /// # use azul_core::r#async::Thread;
     /// #
     /// fn pure_function(input: usize) -> usize { input + 1 }
     ///
@@ -287,9 +288,9 @@ impl<T> Thread<T> {
     ///
     /// // thread_1, thread_2 and thread_3 run in parallel here...
     ///
-    /// let result_1 = thread_1.await();
-    /// let result_2 = thread_2.await();
-    /// let result_3 = thread_3.await();
+    /// let result_1 = thread_1.r#await();
+    /// let result_2 = thread_2.r#await();
+    /// let result_3 = thread_3.r#await();
     ///
     /// assert_eq!(result_1, Ok(6));
     /// assert_eq!(result_2, Ok(11));
@@ -320,7 +321,7 @@ impl<T> Thread<T> {
     }
 
     /// Block until the internal thread has finished and return T
-    pub fn await(mut self) -> Result<T, AwaitError> {
+    pub fn r#await(mut self) -> Result<T, AwaitError> {
         // .await() can only be called once, so these .unwrap()s are safe
         let handle = self.join_handle.take().unwrap();
         let data = self.data.take().unwrap();

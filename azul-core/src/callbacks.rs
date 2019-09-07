@@ -1,24 +1,24 @@
+pub use crate::stack_checked_pointer::StackCheckedPointer;
+use crate::{
+    app::{AppState, AppStateNoData},
+    app_resources::AppResources,
+    app_resources::{LayoutedGlyphs, ScaledWords, WordPositions, Words},
+    dom::{Dom, DomId, NodeData, NodeType},
+    gl::Texture,
+    id_tree::{Node, NodeHierarchy, NodeId},
+    r#async::TerminateTimer,
+    ui_solver::{LayoutedRectangle, PositionedRectangle},
+    ui_state::UiState,
+    window::{FakeWindow, KeyboardState, LogicalSize, MouseState, PhysicalSize, WindowId},
+};
 use azul_css::{CssPath, LayoutPoint, LayoutRect};
 #[cfg(feature = "css_parser")]
 use azul_css_parser::CssPathParseError;
 pub use gleam::gl::Gl;
-pub use stack_checked_pointer::StackCheckedPointer;
 use std::{
     collections::BTreeMap,
     fmt,
     sync::atomic::{AtomicUsize, Ordering},
-};
-use {
-    app::{AppState, AppStateNoData},
-    app_resources::AppResources,
-    app_resources::{LayoutedGlyphs, ScaledWords, WordPositions, Words},
-    async::TerminateTimer,
-    dom::{Dom, DomId, NodeData, NodeType},
-    gl::Texture,
-    id_tree::{Node, NodeHierarchy, NodeId},
-    ui_solver::{LayoutedRectangle, PositionedRectangle},
-    ui_state::UiState,
-    window::{FakeWindow, KeyboardState, LogicalSize, MouseState, PhysicalSize, WindowId},
 };
 
 /// A callback function has to return if the screen should be updated after the

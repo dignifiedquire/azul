@@ -3,7 +3,8 @@
 use std::{collections::BTreeMap, fmt, path::Path};
 use xmlparser::Tokenizer;
 pub use xmlparser::{Error as XmlError, StreamError, TextPos, TokenType};
-use {callbacks::Callback, dom::Dom};
+
+use crate::{callbacks::Callback, dom::Dom};
 
 /// Error that can happen during hot-reload -
 /// stringified, since it is only used for printing and is not exposed in the public API
@@ -849,7 +850,7 @@ fn set_attributes<T>(
     xml_attributes: &XmlAttributeMap,
     filtered_xml_attributes: &FilteredComponentArguments,
 ) {
-    use dom::{DomString, TabIndex};
+    use crate::dom::{DomString, TabIndex};
 
     if let Some(ids) = xml_attributes.get("id") {
         for id in ids.split_whitespace() {
@@ -1026,7 +1027,7 @@ fn render_single_dom_node_to_string<T>(dom: &Dom<T>, existing_str: &mut String) 
     }
 
     if let Some(tab_index) = head.get_tab_index() {
-        use dom::TabIndex::*;
+        use crate::dom::TabIndex::*;
         existing_str.push_str(&format!(
             ".with_tab_index({})",
             match tab_index {

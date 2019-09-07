@@ -4,7 +4,8 @@ use azul_css::{
     Css, CssContentGroup, CssNthChildSelector::*, CssPath, CssPathPseudoSelector, CssPathSelector,
 };
 use std::{collections::BTreeMap, fmt};
-use {
+
+use crate::{
     callbacks::{FocusTarget, HitTestItem},
     dom::{DomId, NodeData},
     id_tree::{NodeDataContainer, NodeHierarchy, NodeId},
@@ -584,9 +585,9 @@ pub fn update_focus_from_callbacks<'a, T: 'a>(
 
 #[test]
 fn test_case_issue_93() {
+    use crate::dom::*;
     use azul_css::CssPathSelector::*;
     use azul_css::*;
-    use dom::*;
 
     struct DataModel;
 

@@ -1,11 +1,11 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
-use std::{collections::BTreeMap, marker::PhantomData};
-use {
+use crate::{
     dom::{Dom, NodeData},
     id_tree::{NodeHierarchy, NodeId},
 };
+use std::{collections::BTreeMap, marker::PhantomData};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct DomRange<F: FrameMarker> {

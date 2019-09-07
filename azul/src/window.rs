@@ -1,3 +1,11 @@
+pub use crate::window_state::*;
+use crate::{
+    app::FrameEventInfo,
+    callbacks::{PipelineId, ScrollPosition},
+    compositor::Compositor,
+    dom::{DomId, NodeId},
+    FastHashMap,
+};
 pub use azul_core::window::*;
 use azul_core::{
     display_list::CachedDisplayList,
@@ -31,14 +39,6 @@ use webrender::{
     ShaderPrecacheFlags,
     WrShaders,
     // renderer::RendererError; -- not currently public in WebRender
-};
-pub use window_state::*;
-use {
-    app::FrameEventInfo,
-    callbacks::{PipelineId, ScrollPosition},
-    compositor::Compositor,
-    dom::{DomId, NodeId},
-    FastHashMap,
 };
 
 // TODO: Right now it's not very ergonomic to cache shaders between
@@ -411,7 +411,7 @@ impl<T> Window<T> {
         mut css: Css,
         background_color: ColorU,
     ) -> Result<Self, WindowCreateError> {
-        use wr_translate::wr_translate_logical_size;
+        use crate::wr_translate::wr_translate_logical_size;
 
         // NOTE: It would be OK to use &RenderApi here, but it's better
         // to make sure that the RenderApi is currently not in use by anything else.
@@ -696,7 +696,7 @@ fn synchronize_mouse_state(
     new_mouse_state: &MouseState,
     window: &GliumWindow,
 ) {
-    use wr_translate::winit_translate_cursor;
+    use crate::wr_translate::winit_translate_cursor;
     match (
         old_mouse_state.mouse_cursor_type,
         new_mouse_state.mouse_cursor_type,

@@ -154,7 +154,7 @@ pub struct SvgShader {
 }
 
 impl SvgShader {
-    pub fn new(gl_context: Rc<Gl>) -> Self {
+    pub fn new(gl_context: Rc<dyn Gl>) -> Self {
         let current_gl_api = GlApiVersion::get(&*gl_context);
         let vertex_source_prefixed = prefix_gl_version(SVG_VERTEX_SHADER, current_gl_api);
         let fragment_source_prefixed = prefix_gl_version(SVG_FRAGMENT_SHADER, current_gl_api);
@@ -298,7 +298,7 @@ impl SvgCache {
     }
 
     /// Builds and compiles the SVG shader if the shader isn't already present
-    fn init_shader<'a>(&'a self, gl_context: Rc<Gl>) {
+    fn init_shader<'a>(&'a self, gl_context: Rc<dyn Gl>) {
         self.shader
             .borrow_mut()
             .get_or_insert_with(|| SvgShader::new(gl_context));
@@ -1521,7 +1521,7 @@ mod svg_to_lyon {
 
     use azul_css::ColorU;
     use lyon::{math::Point, path::PathEvent};
-    use svg::{SvgLayerType, SvgLineCap, SvgLineJoin, SvgParseError, SvgStrokeOptions, SvgStyle};
+    use crate::svg::{SvgLayerType, SvgLineCap, SvgLineJoin, SvgParseError, SvgStrokeOptions, SvgStyle};
     use usvg::{Color, LineCap, LineJoin, NodeKind, Options, Paint, PathSegment, Stroke, Tree};
 
     pub fn parse_from<S: AsRef<str>>(

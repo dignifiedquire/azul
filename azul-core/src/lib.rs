@@ -7,7 +7,7 @@ extern crate gleam;
 
 pub mod app;
 pub mod app_resources;
-pub mod async;
+pub mod r#async;
 pub mod callbacks;
 pub mod diff;
 pub mod display_list;

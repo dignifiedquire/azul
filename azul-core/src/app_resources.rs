@@ -1,6 +1,9 @@
 use azul_css::{LayoutPoint, LayoutSize};
 use std::{fmt, path::PathBuf};
-use {display_list::GlyphInstance, ui_solver::ResolvedTextLayoutOptions, FastHashMap, FastHashSet};
+
+use crate::{
+    display_list::GlyphInstance, ui_solver::ResolvedTextLayoutOptions, FastHashMap, FastHashSet,
+};
 
 pub type CssImageId = String;
 pub type CssFontId = String;

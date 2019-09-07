@@ -4,7 +4,8 @@ use std::{
     rc::Rc,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use {
+
+use crate::{
     callbacks::{DefaultCallback, DefaultCallbackId, DefaultCallbackTypeUnchecked},
     display_list::CachedDisplayList,
     dom::DomId,

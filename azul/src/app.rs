@@ -1,6 +1,8 @@
-pub use app_resources::AppResources;
+pub use crate::app_resources::AppResources;
 #[cfg(test)]
-use app_resources::FakeRenderApi;
+use crate::app_resources::FakeRenderApi;
+#[cfg(not(test))]
+use crate::window::{FakeDisplay, WindowCreateError, WindowCreateOptions};
 pub use azul_core::app::*;
 #[cfg(not(test))]
 use azul_core::window::FakeWindow;
@@ -19,9 +21,8 @@ use webrender::{
     api::{DevicePixel, Epoch, LayoutSize, Transaction},
     PipelineInfo, Renderer,
 };
-#[cfg(not(test))]
-use window::{FakeDisplay, WindowCreateError, WindowCreateOptions};
-use {
+
+use crate::{
     callbacks::{
         DontRedraw, FocusTarget, HitTestItem, LayoutCallback, Redraw, ScrollPosition, UpdateScreen,
     },
@@ -153,18 +154,18 @@ impl<T: Layout> App<T> {
         #[cfg(feature = "logging")]
         {
             if let Some(log_level) = app_config.enable_logging {
-                ::logging::set_up_logging(
+                crate::logging::set_up_logging(
                     app_config.log_file_path.as_ref().map(|s| s.as_str()),
                     log_level,
                 );
 
                 if app_config.enable_logging_on_panic {
-                    ::logging::set_up_panic_hooks();
+                    crate::logging::set_up_panic_hooks();
                 }
 
                 if app_config.enable_visual_panic_hook {
                     use std::sync::atomic::Ordering;
-                    ::logging::SHOULD_ENABLE_PANIC_HOOK.store(true, Ordering::SeqCst);
+                    crate::logging::SHOULD_ENABLE_PANIC_HOOK.store(true, Ordering::SeqCst);
                 }
             }
         }
@@ -239,7 +240,8 @@ impl<T> App<T> {
     /// the `.run` method.
     #[cfg(not(test))]
     pub fn add_window(&mut self, window: Window<T>) {
-        use window_state::full_window_state_from_normal_state;
+        use crate::window_state::full_window_state_from_normal_state;
+
         let window_id = window.id;
         let fake_window = FakeWindow {
             state: window.state.clone(),
@@ -308,12 +310,12 @@ impl<T> App<T> {
 
     #[cfg(not(test))]
     fn run_inner(&mut self) -> Result<(), RuntimeError> {
+        use crate::ui_state::{ui_state_from_app_state, ui_state_from_dom};
         use azul_core::app::RuntimeError::*;
         use glium::glutin::{
             event::Event, event_loop::ControlFlow, window::WindowId as GliumWindowId,
         };
         use std::{thread, time::Duration};
-        use ui_state::{ui_state_from_app_state, ui_state_from_dom};
 
         // Initialize UI state cache
         let mut ui_state_cache = initialize_ui_state_cache(
@@ -488,7 +490,7 @@ impl<T> App<T> {
                     .get_mut(&window_id)
                     .ok_or(WindowIndexError)
                     .expect("do better")
-                    .state = ::window::full_window_state_to_window_state(full_window_state);
+                    .state = crate::window::full_window_state_to_window_state(full_window_state);
             }
 
             // If there is a re-render necessary, re-render *all* windows
@@ -515,7 +517,7 @@ impl<T> App<T> {
             }
 
             if should_relayout_all_windows || should_redraw_timers_or_tasks {
-                use app_resources::garbage_collect_fonts_and_images;
+                use crate::app_resources::garbage_collect_fonts_and_images;
 
                 // Automatically remove unused fonts and images from webrender
                 // Tell the font + image GC to start a new frame
@@ -553,7 +555,7 @@ fn initialize_ui_state_cache<T>(
     app_state: &mut AppState<T>,
     layout_callback: LayoutCallback<T>,
 ) -> Result<BTreeMap<WindowId, BTreeMap<DomId, UiState<T>>>, RuntimeError> {
-    use ui_state::{ui_state_from_app_state, ui_state_from_dom};
+    use crate::ui_state::{ui_state_from_app_state, ui_state_from_dom};
 
     let mut ui_state_map = BTreeMap::new();
     let window_ids = windows.keys().cloned().collect::<Vec<_>>();
@@ -711,8 +713,8 @@ fn hit_test_single_window<T>(
     ui_state_cache: &mut BTreeMap<WindowId, BTreeMap<DomId, UiState<T>>>,
     awakened_tasks: &mut BTreeMap<WindowId, bool>,
 ) -> Result<SingleWindowContentResult, RuntimeError> {
+    use crate::window;
     use azul_core::app::RuntimeError::*;
-    use window;
 
     let (mut frame_event_info, window_should_close) =
         window::update_window_state(full_window_state, &events);
@@ -966,7 +968,7 @@ fn do_hit_test<T>(
     full_window_state: &FullWindowState,
     fake_display: &mut FakeDisplay,
 ) -> Option<Vec<HitTestItem>> {
-    use wr_translate::{wr_translate_hittest_item, wr_translate_pipeline_id};
+    use crate::wr_translate::{wr_translate_hittest_item, wr_translate_pipeline_id};
 
     let cursor_location = full_window_state
         .mouse_state
@@ -1023,7 +1025,7 @@ fn call_callbacks<T>(
     ui_state_map: &BTreeMap<DomId, UiState<T>>,
     app_state: &mut AppState<T>,
 ) -> Result<CallCallbackReturn, RuntimeError> {
-    use {
+    use crate::{
         callbacks::{CallbackInfo, DefaultCallbackInfoUnchecked},
         window_state::determine_callbacks,
     };
@@ -1169,12 +1171,12 @@ fn update_display_list<T>(
     fake_display: &mut FakeDisplay,
     app_resources: &mut AppResources,
 ) {
-    use app_resources::add_resources;
-    use display_list::{
+    use crate::app_resources::add_resources;
+    use crate::display_list::{
         display_list_from_ui_description, display_list_to_cached_display_list,
         CachedDisplayListResult,
     };
-    use wr_translate::{wr_translate_display_list, wr_translate_pipeline_id};
+    use crate::wr_translate::{wr_translate_display_list, wr_translate_pipeline_id};
 
     let display_list = display_list_from_ui_description(ui_description, ui_state);
 
@@ -1245,8 +1247,8 @@ fn update_display_list<T>(
 /// NOTE: scroll_states has to be mutable, since every key has a "visited" field, to
 /// indicate whether it was used during the current frame or not.
 fn scroll_all_nodes(scroll_states: &mut ScrollStates, txn: &mut Transaction) {
+    use crate::wr_translate::{wr_translate_external_scroll_id, wr_translate_layout_point};
     use webrender::api::ScrollClamping;
-    use wr_translate::{wr_translate_external_scroll_id, wr_translate_layout_point};
     for (key, value) in scroll_states.0.iter_mut() {
         txn.scroll_node_with_id(
             wr_translate_layout_point(value.get()),
@@ -1305,7 +1307,7 @@ fn update_scroll_state(
 }
 
 fn clean_up_unused_opengl_textures(pipeline_info: PipelineInfo) {
-    use compositor::ACTIVE_GL_TEXTURES;
+    use crate::compositor::ACTIVE_GL_TEXTURES;
 
     // TODO: currently active epochs can be empty, why?
     //
@@ -1362,9 +1364,9 @@ fn render_inner<T>(
     mut txn: Transaction,
     background_color: ColorU,
 ) {
+    use crate::wr_translate;
     use azul_css::ColorF;
     use webrender::api::{DeviceIntPoint, DeviceIntRect};
-    use wr_translate;
 
     let (_, framebuffer_size) = convert_window_size(&window.state.size);
 

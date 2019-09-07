@@ -21,7 +21,8 @@ use webrender::api::{
     AddImage, Epoch, ExternalImageData, ExternalImageId, ExternalImageType, ImageData,
     TextureTarget,
 };
-use {
+
+use crate::{
     app_resources::{AddImageMsg, AppResources, FontImageApi},
     callbacks::LayoutInfo,
     callbacks::{GlCallback, IFrameCallback, StackCheckedPointer},
@@ -641,7 +642,7 @@ pub(crate) fn display_list_to_cached_display_list<'a, T, U: FontImageApi>(
     app_resources: &mut AppResources,
     render_api: &mut U,
 ) -> CachedDisplayListResult {
-    use app_resources::add_fonts_and_images;
+    use crate::app_resources::add_fonts_and_images;
 
     let arena = &display_list.ui_descr.ui_descr_arena;
     let node_hierarchy = &arena.node_layout;
@@ -882,8 +883,8 @@ fn displaylist_handle_rect<'a, 'b, 'c, 'd, 'e, 'f, T, U: FontImageApi>(
                 .get(&rect_idx)
                 .cloned()
             {
+                use crate::wr_translate::wr_translate_logical_size;
                 use azul_core::ui_solver::DEFAULT_FONT_COLOR;
-                use wr_translate::wr_translate_logical_size;
 
                 let text_color = rect
                     .style
@@ -1007,9 +1008,9 @@ fn call_opengl_callback<'a, 'b, 'c, 'd, 'e, 'f, T, U: FontImageApi>(
     };
     use gleam::gl;
     use {
-        app_resources::ImageInfo,
-        compositor::{ActiveTexture, ACTIVE_GL_TEXTURES},
-        wr_translate::{
+        crate::app_resources::ImageInfo,
+        crate::compositor::{ActiveTexture, ACTIVE_GL_TEXTURES},
+        crate::wr_translate::{
             hidpi_rect_from_bounds, wr_translate_image_descriptor, wr_translate_image_key,
         },
     };
@@ -1117,10 +1118,10 @@ fn call_iframe_callback<'a, 'b, 'c, 'd, 'e, T, U: FontImageApi>(
     referenced_mutable_content: &mut DisplayListParametersMut<'e, T, U>,
     parent_dom_id: Option<(DomId, NodeId)>,
 ) -> DisplayListMsg {
-    use app_resources;
+    use crate::app_resources;
+    use crate::ui_state::ui_state_from_dom;
+    use crate::wr_translate::hidpi_rect_from_bounds;
     use azul_core::callbacks::IFrameCallbackInfoUnchecked;
-    use ui_state::ui_state_from_dom;
-    use wr_translate::hidpi_rect_from_bounds;
 
     let bounds = hidpi_rect_from_bounds(
         rect,
@@ -1424,7 +1425,7 @@ fn apply_style_property(style: &mut RectStyle, layout: &mut RectLayout, property
 
 #[test]
 fn test_overflow_parsing() {
-    use prelude::Overflow;
+    use crate::prelude::Overflow;
 
     let layout1 = RectLayout::default();
 

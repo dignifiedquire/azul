@@ -1,6 +1,7 @@
-use dialogs::msg_box_ok;
 use log::LevelFilter;
 use std::sync::atomic::{AtomicBool, Ordering};
+
+use crate::dialogs::msg_box_ok;
 
 pub(crate) static SHOULD_ENABLE_PANIC_HOOK: AtomicBool = AtomicBool::new(false);
 

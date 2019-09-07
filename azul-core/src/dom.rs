@@ -1,5 +1,4 @@
 use azul_css::{CssProperty, NodeTypePath};
-pub use id_tree::{Node, NodeHierarchy, NodeId};
 use std::{
     cmp::Ordering as CmpOrdering,
     fmt,
@@ -7,7 +6,9 @@ use std::{
     iter::FromIterator,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use {
+
+pub use crate::id_tree::{Node, NodeHierarchy, NodeId};
+use crate::{
     app_resources::{ImageId, TextId},
     callbacks::{
         Callback, CallbackType, DefaultCallbackId, GlCallback, GlCallbackTypeUnchecked,
@@ -1201,7 +1202,7 @@ impl<T> FromIterator<NodeType<T>> for Dom<T> {
 
 /// TODO: promote to const fn once `const_vec_new` is stable
 fn init_arena_with_node_data<T>(node_data: NodeData<T>) -> Arena<NodeData<T>> {
-    use id_tree::ROOT_NODE;
+    use crate::id_tree::ROOT_NODE;
     Arena {
         node_layout: NodeHierarchy {
             internal: vec![ROOT_NODE],
@@ -1587,7 +1588,7 @@ fn test_dom_sibling_1() {
 
 #[test]
 fn test_dom_from_iter_1() {
-    use id_tree::Node;
+    use crate::id_tree::Node;
 
     struct TestLayout;
 

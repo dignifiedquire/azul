@@ -1,7 +1,8 @@
 use std::{collections::BTreeMap, fmt};
-use {
+
+use crate::{
     app_resources::AppResources,
-    async::{Task, Timer, TimerId},
+    r#async::{Task, Timer, TimerId},
     window::{FakeWindow, WindowId},
     FastHashMap,
 };

@@ -10,7 +10,8 @@ use webrender::api::{AddFont, AddFontInstance, AddImage, RenderApi, ResourceUpda
 pub use webrender::api::{
     ImageData as WrImageData, ImageDescriptor as WrImageDescriptor, ImageFormat as WrImageFormat,
 };
-use {display_list::DisplayList, FastHashMap, FastHashSet};
+
+use crate::{display_list::DisplayList, FastHashMap, FastHashSet};
 
 #[derive(Debug)]
 pub enum ImageReloadError {
@@ -21,18 +22,18 @@ pub enum ImageReloadError {
     DecodingModuleNotActive,
 }
 
-impl Clone for ImageReloadError {
-    fn clone(&self) -> Self {
-        use self::ImageReloadError::*;
-        match self {
-            Io(err, path) => Io(IoError::new(err.kind(), "Io Error"), path.clone()),
-            #[cfg(feature = "image_loading")]
-            DecodingError(e) => DecodingError(e.clone()),
-            #[cfg(not(feature = "image_loading"))]
-            DecodingModuleNotActive => DecodingModuleNotActive,
-        }
-    }
-}
+// impl Clone for ImageReloadError {
+//     fn clone(&self) -> Self {
+//         use self::ImageReloadError::*;
+//         match self {
+//             Io(err, path) => Io(IoError::new(err.kind(), "Io Error"), path.clone()),
+//             #[cfg(feature = "image_loading")]
+//             DecodingError(ref e) => DecodingError(e.clone()),
+//             #[cfg(not(feature = "image_loading"))]
+//             DecodingModuleNotActive => DecodingModuleNotActive,
+//         }
+//     }
+// }
 
 impl fmt::Display for ImageReloadError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -99,15 +100,15 @@ pub(crate) trait FontImageApi {
 
 impl FontImageApi for RenderApi {
     fn new_image_key(&self) -> ImageKey {
-        use wr_translate::translate_image_key_wr;
+        use crate::wr_translate::translate_image_key_wr;
         translate_image_key_wr(self.generate_image_key())
     }
     fn new_font_key(&self) -> FontKey {
-        use wr_translate::translate_font_key_wr;
+        use crate::wr_translate::translate_font_key_wr;
         translate_font_key_wr(self.generate_font_key())
     }
     fn new_font_instance_key(&self) -> FontInstanceKey {
-        use wr_translate::translate_font_instance_key_wr;
+        use crate::wr_translate::translate_font_instance_key_wr;
         translate_font_instance_key_wr(self.generate_font_instance_key())
     }
     fn update_resources(&self, updates: Vec<ResourceUpdate>) {
@@ -201,7 +202,7 @@ pub(crate) fn garbage_collect_fonts_and_images<U: FontImageApi>(
 pub fn image_source_get_bytes(
     image_source: &ImageSource,
 ) -> Result<(WrImageData, WrImageDescriptor), ImageReloadError> {
-    use wr_translate::wr_translate_image_format;
+    use crate::wr_translate::wr_translate_image_format;
 
     match image_source {
         ImageSource::Embedded(bytes) => {
@@ -263,8 +264,8 @@ fn scan_ui_description_for_font_keys<'a, T>(
     app_resources: &AppResources,
     display_list: &DisplayList<'a, T>,
 ) -> FastHashMap<ImmediateFontId, FastHashSet<Au>> {
-    use dom::NodeType::*;
-    use ui_solver;
+    use crate::dom::NodeType::*;
+    use crate::ui_solver;
 
     let mut font_keys = FastHashMap::default();
 
@@ -297,7 +298,7 @@ fn scan_ui_description_for_image_keys<'a, T>(
     app_resources: &AppResources,
     display_list: &DisplayList<'a, T>,
 ) -> FastHashSet<ImageId> {
-    use dom::NodeType::*;
+    use crate::dom::NodeType::*;
 
     display_list
         .rectangles
@@ -346,7 +347,7 @@ struct DeleteImageMsg(ImageKey, ImageInfo);
 impl AddFontMsg {
     fn into_resource_update(&self) -> ResourceUpdate {
         use self::AddFontMsg::*;
-        use wr_translate::wr_translate_font_key;
+        use crate::wr_translate::wr_translate_font_key;
         match self {
             Font(f) => ResourceUpdate::AddFont(AddFont::Raw(
                 wr_translate_font_key(f.font_key),
@@ -361,7 +362,7 @@ impl AddFontMsg {
 impl DeleteFontMsg {
     fn into_resource_update(&self) -> ResourceUpdate {
         use self::DeleteFontMsg::*;
-        use wr_translate::{wr_translate_font_instance_key, wr_translate_font_key};
+        use crate::wr_translate::{wr_translate_font_instance_key, wr_translate_font_key};
         match self {
             Font(f) => ResourceUpdate::DeleteFont(wr_translate_font_key(*f)),
             Instance(fi, _) => {
@@ -379,7 +380,7 @@ impl AddImageMsg {
 
 impl DeleteImageMsg {
     fn into_resource_update(&self) -> ResourceUpdate {
-        use wr_translate::wr_translate_image_key;
+        use crate::wr_translate::wr_translate_image_key;
         ResourceUpdate::DeleteImage(wr_translate_image_key(self.0.clone()))
     }
 }
@@ -406,7 +407,7 @@ fn build_add_font_resource_updates<T: FontImageApi>(
     for (im_font_id, font_sizes) in fonts_in_dom {
         macro_rules! insert_font_instances {
             ($font_id:expr, $font_key:expr, $font_index:expr, $font_size:expr) => {{
-                use wr_translate::{
+                use crate::wr_translate::{
                     translate_au, wr_translate_font_instance_key, wr_translate_font_key,
                 };
 
@@ -543,7 +544,7 @@ fn build_add_image_resource_updates<T: FontImageApi>(
     render_api: &mut T,
     images_in_dom: &FastHashSet<ImageId>,
 ) -> Vec<(ImageId, AddImageMsg)> {
-    use wr_translate::{translate_image_descriptor_wr, wr_translate_image_key};
+    use crate::wr_translate::{translate_image_descriptor_wr, wr_translate_image_key};
 
     images_in_dom
         .iter()
@@ -599,7 +600,7 @@ pub(crate) fn add_resources<T: FontImageApi>(
     add_font_resources: Vec<(ImmediateFontId, AddFontMsg)>,
     add_image_resources: Vec<(ImageId, AddImageMsg)>,
 ) {
-    use wr_translate::translate_font_instance_key_wr;
+    use crate::wr_translate::translate_font_instance_key_wr;
 
     let mut merged_resource_updates = Vec::new();
 
@@ -738,8 +739,6 @@ fn delete_resources<T: FontImageApi>(
 
 #[cfg(feature = "image_loading")]
 fn decode_image_data(image_data: Vec<u8>) -> Result<(WrImageData, WrImageDescriptor), ImageError> {
-    use image; // the crate
-
     let image_format = image::guess_format(&image_data)?;
     let decoded = image::load_from_memory_with_format(&image_data, image_format)?;
     Ok(prepare_image(decoded)?)
@@ -848,8 +847,7 @@ fn test_parse_gsettings_font() {
 fn prepare_image(
     image_decoded: DynamicImage,
 ) -> Result<(WrImageData, WrImageDescriptor), ImageError> {
-    use image;
-    use wr_translate::wr_translate_image_format;
+    use crate::wr_translate::wr_translate_image_format;
 
     let image_dims = image_decoded.dimensions();
 

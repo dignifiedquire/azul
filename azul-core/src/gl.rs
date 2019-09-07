@@ -6,7 +6,8 @@ use std::{
     marker::PhantomData,
     rc::Rc,
 };
-use window::LogicalSize;
+
+use crate::window::LogicalSize;
 
 /// Typedef for an OpenGL handle
 pub type GLuint = u32;

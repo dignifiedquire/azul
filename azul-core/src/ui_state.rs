@@ -1,6 +1,7 @@
 use azul_css::CssProperty;
 use std::{collections::BTreeMap, fmt};
-use {
+
+use crate::{
     app::{AppState, RuntimeError},
     callbacks::{Callback, DefaultCallbackId, LayoutInfo},
     dom::{
@@ -115,7 +116,7 @@ pub fn ui_state_from_app_state<T>(
     parent_dom: Option<(DomId, NodeId)>,
     layout_callback: fn(&T, layout_info: LayoutInfo<T>) -> Dom<T>,
 ) -> Result<UiState<T>, RuntimeError> {
-    use app::RuntimeError::*;
+    use crate::app::RuntimeError::*;
 
     // Only shortly lock the data to get the dom out
     let dom: Dom<T> = {
@@ -144,7 +145,7 @@ pub fn ui_state_create_tags_for_hover_nodes<T>(
     ui_state: &mut UiState<T>,
     hover_nodes: &BTreeMap<NodeId, HoverGroup>,
 ) {
-    use dom::new_tag_id;
+    use crate::dom::new_tag_id;
 
     for (hover_node_id, hover_group) in hover_nodes {
         let hover_tag = match ui_state.node_ids_to_tag_ids.get(hover_node_id) {
@@ -171,7 +172,7 @@ pub fn ui_state_from_dom<T>(
     dom: Dom<T>,
     parent_dom_node_id: Option<(DomId, NodeId)>,
 ) -> UiState<T> {
-    use dom::{self, new_tag_id};
+    use crate::dom::{self, new_tag_id};
 
     // NOTE: Originally it was allowed to create a DOM with
     // multiple root elements using `add_sibling()` and `with_sibling()`.

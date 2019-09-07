@@ -1,6 +1,6 @@
 //! Provides a public API with datatypes used to describe style properties of DOM nodes.
 
-use css::CssPropertyValue;
+use crate::css::CssPropertyValue;
 use std::collections::BTreeMap;
 use std::fmt;
 

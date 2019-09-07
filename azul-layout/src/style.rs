@@ -21,8 +21,8 @@
 // SOFTWARE.
 
 use azul_css::PixelValue;
-use geometry::{Offsets, Size};
-use number::Number;
+use crate::geometry::{Offsets, Size};
+use crate::number::Number;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum AlignItems {

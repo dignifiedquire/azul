@@ -70,8 +70,6 @@
 //! # Hello world
 //!
 //! ```no_run
-//! extern crate azul;
-//!
 //! use azul::prelude::*;
 //!
 //! struct MyDataModel { }
@@ -133,43 +131,11 @@
 #![deny(missing_copy_implementations)]
 #![deny(clippy::all)]
 
-extern crate azul_core;
-extern crate azul_css;
-#[cfg(feature = "css_parser")]
-extern crate azul_css_parser;
-extern crate azul_layout;
-extern crate azul_native_style;
-#[cfg(feature = "widgets")]
-extern crate azul_widgets;
-extern crate gleam;
-#[cfg(feature = "serde_serialization")]
-extern crate serde;
-#[cfg(feature = "serde_serialization")]
-extern crate serde_derive;
-
 #[macro_use]
 extern crate lazy_static;
 #[cfg(feature = "logging")]
 #[macro_use]
 extern crate log;
-
-extern crate app_units;
-extern crate clipboard2;
-extern crate euclid;
-extern crate font_loader;
-extern crate glium;
-extern crate harfbuzz_sys;
-extern crate tinyfiledialogs;
-extern crate unicode_normalization;
-extern crate webrender;
-extern crate xmlparser;
-
-#[cfg(feature = "logging")]
-extern crate backtrace;
-#[cfg(feature = "logging")]
-extern crate fern;
-#[cfg(feature = "image_loading")]
-extern crate image;
 
 #[cfg(feature = "widgets")]
 pub mod widgets {
@@ -189,7 +155,7 @@ pub mod widgets {
             mut text_layout_options: ResolvedTextLayoutOptions,
             horizontal_alignment: StyleTextAlignmentHorz,
         ) -> SvgTextLayout {
-            use text_layout;
+            use crate::text_layout;
 
             text_layout_options.font_size_px = SVG_FAKE_FONT_SIZE;
             let words = text_layout::split_text_into_words(text);
@@ -228,10 +194,10 @@ mod macros;
 
 /// Manages application state (`App` / `AppState` / `AppResources`), wrapping resources and app state
 pub mod app;
-/// Async IO helpers / (`Task` / `Timer` / `Thread`)
-pub use azul_core::async;
 /// Type definitions for various types of callbacks, as well as focus and scroll handling
 pub use azul_core::callbacks;
+/// Async IO helpers / (`Task` / `Timer` / `Thread`)
+pub use azul_core::r#async;
 /// CSS type definitions / CSS parsing functions
 #[cfg(any(feature = "css_parser", feature = "native_style"))]
 pub mod css;
@@ -283,7 +249,7 @@ pub use azul_core::{FastHashMap, FastHashSet};
 /// Font & image resource handling, lookup and caching
 pub mod resources {
     // re-export everything *except* the AppResources (which are exported under the "app" module)
-    pub use app_resources::{
+    pub use crate::app_resources::{
         font_source_get_bytes, image_source_get_bytes, CssFontId, CssImageId, FontId,
         FontReloadError, FontSource, ImageId, ImageReloadError, ImageSource, LoadedFont, RawImage,
         RawImageFormat, TextCache, TextId,
@@ -292,44 +258,44 @@ pub mod resources {
 
 /// Quick exports of common types
 pub mod prelude {
-    pub use app::{App, AppConfig, AppResources, AppState};
-    pub use async::{DropCheck, Task, TerminateTimer, Timer, TimerId};
-    pub use azul_core::{
-        callbacks::StackCheckedPointer,
-        ui_solver::{ResolvedTextLayoutOptions, TextLayoutOptions},
-    };
-    pub use azul_css::*;
-    pub use callbacks::*;
-    pub use dom::{
+    pub use crate::app::{App, AppConfig, AppResources, AppState};
+    pub use crate::callbacks::*;
+    pub use crate::dom::{
         Dom, DomHash, DomString, EventFilter, FocusEventFilter, HoverEventFilter, NodeData,
         NodeType, NotEventFilter, On, TabIndex, WindowEventFilter,
     };
-    pub use gl::{
+    pub use crate::gl::{
         FragmentShaderCompileError, GLuint, GlApiVersion, GlShader, GlShaderCreateError,
         GlShaderLinkError, IndexBufferFormat, Texture, Uniform, UniformType, VertexAttribute,
         VertexAttributeType, VertexBuffer, VertexLayout, VertexLayoutDescription,
         VertexShaderCompileError,
     };
-    pub use resources::{
+    pub use crate::r#async::{DropCheck, Task, TerminateTimer, Timer, TimerId};
+    pub use crate::resources::{
         FontId, FontSource, ImageId, ImageSource, RawImageFormat, TextCache, TextId,
     };
-    pub use text_layout::GlyphInstance;
-    pub use traits::{Layout, Modify};
-    pub use window::{
+    pub use crate::text_layout::GlyphInstance;
+    pub use crate::traits::{Layout, Modify};
+    pub use crate::window::{
         keymap, AcceleratorKey, AvailableMonitorsIter, DebugState, KeyboardState, LogicalPosition,
         LogicalSize, MouseState, PhysicalPosition, PhysicalSize, RendererType, ScanCode,
         VirtualKeyCode, Window, WindowCreateOptions, WindowMonitorTarget, WindowState,
     };
-    pub use xml::{DomXml, XmlComponent, XmlComponentMap};
+    pub use crate::xml::{DomXml, XmlComponent, XmlComponentMap};
+    pub use azul_core::{
+        callbacks::StackCheckedPointer,
+        ui_solver::{ResolvedTextLayoutOptions, TextLayoutOptions},
+    };
+    pub use azul_css::*;
 
-    pub use css;
+    pub use crate::css;
     #[cfg(feature = "logging")]
     pub use log::LevelFilter;
 }
 
 /// Re-exports of errors
 pub mod errors {
-    pub use {
+    pub use crate::{
         app::RuntimeError,
         app_resources::{FontReloadError, ImageReloadError},
         window::WindowCreateError,

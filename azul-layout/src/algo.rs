@@ -31,7 +31,7 @@ use azul_core::{
 };
 use azul_css::{LayoutPoint, LayoutRect, LayoutSize};
 
-use {
+use crate::{
     geometry::{Offsets, Rect, RectSize, Size},
     number::{
         MinMax,
@@ -349,7 +349,7 @@ fn compute_internal<T: GetTextLayout>(
             };
         }
 
-        use RectContent::*;
+        use crate::RectContent::*;
 
         match content {
             Text(t) => {

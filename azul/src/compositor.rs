@@ -7,7 +7,8 @@ use webrender::{
     api::{DevicePixel, Epoch, ExternalImageId, ImageRendering, TexelRect},
     ExternalImage, ExternalImageHandler, ExternalImageSource,
 };
-use {gl::Texture, FastHashMap};
+
+use crate::{gl::Texture, FastHashMap};
 
 static LAST_OPENGL_ID: AtomicUsize = AtomicUsize::new(0);
 

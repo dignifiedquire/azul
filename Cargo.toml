@@ -8,3 +8,7 @@ members = [
     "azul-css-parser",
     "azul-native-style",
 ]
+
+# Macos: Need the latest version to have run_return implemented
+[patch.crates-io]
+winit = { git = 'https://github.com/rust-windowing/winit' }

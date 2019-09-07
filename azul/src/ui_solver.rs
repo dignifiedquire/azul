@@ -8,7 +8,8 @@ use azul_css::{
 };
 use azul_layout::{GetTextLayout, RectContent};
 use std::{collections::BTreeMap, f32};
-use {
+
+use crate::{
     app_resources::AppResources,
     display_list::DisplayRectangle,
     dom::{NodeData, NodeType},
@@ -83,7 +84,7 @@ impl<'a> GetTextLayout for InlineText<'a> {
         &mut self,
         text_layout_options: &ResolvedTextLayoutOptions,
     ) -> InlineTextLayout {
-        use text_layout;
+        use crate::text_layout;
         let layouted_text_block =
             text_layout::position_words(self.words, self.scaled_words, text_layout_options);
         // TODO: Cache the layouted text block on the &mut self
@@ -146,7 +147,7 @@ fn create_word_cache<T>(
     app_resources: &AppResources,
     node_data: &NodeDataContainer<NodeData<T>>,
 ) -> BTreeMap<NodeId, Words> {
-    use text_layout::split_text_into_words;
+    use crate::text_layout::split_text_into_words;
     node_data
         .linear_iter()
         .filter_map(|node_id| match &node_data[node_id].get_node_type() {
@@ -164,9 +165,9 @@ fn create_scaled_words<'a>(
     words: &BTreeMap<NodeId, Words>,
     display_rects: &NodeDataContainer<DisplayRectangle<'a>>,
 ) -> BTreeMap<NodeId, (ScaledWords, FontInstanceKey)> {
-    use app_resources::ImmediateFontId;
+    use crate::app_resources::ImmediateFontId;
+    use crate::text_layout::words_to_scaled_words;
     use azul_core::ui_solver::DEFAULT_FONT_SIZE_PX;
-    use text_layout::words_to_scaled_words;
 
     words
         .iter()
@@ -228,7 +229,7 @@ fn create_word_positions<'a>(
     scaled_words: &BTreeMap<NodeId, (ScaledWords, FontInstanceKey)>,
     layouted_rects: &NodeDataContainer<PositionedRectangle>,
 ) -> BTreeMap<NodeId, (WordPositions, FontInstanceKey)> {
-    use text_layout;
+    use crate::text_layout;
     words
         .iter()
         .filter_map(|(node_id, words)| {
@@ -250,7 +251,7 @@ fn get_glyphs<'a>(
     display_rects: &NodeDataContainer<DisplayRectangle<'a>>,
     positioned_rectangles: &mut NodeDataContainer<PositionedRectangle>,
 ) -> BTreeMap<NodeId, LayoutedGlyphs> {
-    use text_layout::get_layouted_glyphs;
+    use crate::text_layout::get_layouted_glyphs;
 
     scaled_words
         .iter()
@@ -332,7 +333,7 @@ fn determine_text_alignment(
 mod layout_tests {
 
     use super::*;
-    use id_tree::{Node, NodeId};
+    use crate::id_tree::{Node, NodeId};
 
     /// Returns a DOM for testing so we don't have to construct it every time.
     /// The DOM structure looks like this:

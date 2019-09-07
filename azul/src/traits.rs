@@ -1,7 +1,7 @@
-use dom::Dom;
 use std::sync::{Arc, Mutex};
 
-use callbacks::LayoutInfo;
+use crate::callbacks::LayoutInfo;
+use crate::dom::Dom;
 
 /// The core trait that has to be implemented for the app model to provide a mapping from an
 /// application state to a user interface state (Model -> View).

@@ -30,15 +30,15 @@ use azul_core::{
 };
 use azul_css::LayoutRect;
 use std::collections::BTreeMap;
-use style::Style;
+use crate::style::Style;
 
 mod algo;
 mod geometry;
 mod number;
 
 pub mod style;
-pub use geometry::{Offsets, Size};
-pub use number::Number;
+pub use crate::geometry::{Offsets, Size};
+pub use crate::number::Number;
 
 pub trait GetStyle {
     fn get_style(&self) -> Style;
