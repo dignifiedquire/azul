@@ -93,7 +93,7 @@ pub(crate) trait FontImageApi {
     fn new_image_key(&self) -> ImageKey;
     fn new_font_key(&self) -> FontKey;
     fn new_font_instance_key(&self) -> FontInstanceKey;
-    fn update_resources(&self, Vec<ResourceUpdate>);
+    fn update_resources(&self, updates: Vec<ResourceUpdate>);
     fn flush_scene_builder(&self);
 }
 

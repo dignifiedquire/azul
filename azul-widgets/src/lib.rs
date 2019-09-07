@@ -11,11 +11,11 @@ extern crate serde;
 extern crate serde_derive;
 
 #[cfg(feature = "svg")]
-pub(crate) use azul_dependencies::lyon;
+extern crate lyon;
 #[cfg(feature = "svg")]
-pub(crate) use azul_dependencies::stb_truetype;
+extern crate stb_truetype;
 #[cfg(feature = "svg_parsing")]
-pub(crate) use azul_dependencies::usvg;
+extern crate usvg;
 
 pub mod button;
 pub mod label;

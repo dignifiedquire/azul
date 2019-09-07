@@ -9,7 +9,8 @@ use azul_css::{ColorU, LayoutPoint};
 #[cfg(not(test))]
 use azul_css::{Css, HotReloadHandler};
 use gleam::gl::{self, GLuint, Gl};
-use glium::glutin::WindowEvent;
+use glium::glutin::event::WindowEvent;
+use glium::glutin::platform::desktop::EventLoopExtDesktop;
 use log::LevelFilter;
 use std::{collections::BTreeMap, rc::Rc, time::Instant};
 #[cfg(not(test))]
@@ -21,12 +22,12 @@ use webrender::{
 #[cfg(not(test))]
 use window::{FakeDisplay, WindowCreateError, WindowCreateOptions};
 use {
-    async::{Task, TerminateTimer, TimerId},
     callbacks::{
         DontRedraw, FocusTarget, HitTestItem, LayoutCallback, Redraw, ScrollPosition, UpdateScreen,
     },
     dom::{Dom, DomId, NodeId, ScrollTagId},
     gl::GlShader,
+    r#async::{Task, TerminateTimer, TimerId},
     traits::Layout,
     ui_state::UiState,
     window::{
@@ -208,7 +209,7 @@ impl<T> App<T> {
     ) -> Result<Window<T>, WindowCreateError> {
         Window::new(
             &mut self.fake_display.render_api,
-            &mut self.fake_display.hidden_display.gl_window().context(),
+            self.fake_display.hidden_display.gl_window().context(),
             &mut self.fake_display.hidden_events_loop,
             options,
             css,
@@ -225,7 +226,7 @@ impl<T> App<T> {
     ) -> Result<Window<T>, WindowCreateError> {
         Window::new_hot_reload(
             &mut self.fake_display.render_api,
-            &mut self.fake_display.hidden_display.gl_window().context(),
+            self.fake_display.hidden_display.gl_window().context(),
             &mut self.fake_display.hidden_events_loop,
             options,
             css_loader,
@@ -308,7 +309,9 @@ impl<T> App<T> {
     #[cfg(not(test))]
     fn run_inner(&mut self) -> Result<(), RuntimeError> {
         use azul_core::app::RuntimeError::*;
-        use glium::glutin::{Event, WindowId as GliumWindowId};
+        use glium::glutin::{
+            event::Event, event_loop::ControlFlow, window::WindowId as GliumWindowId,
+        };
         use std::{thread, time::Duration};
         use ui_state::{ui_state_from_app_state, ui_state_from_dom};
 
@@ -327,31 +330,35 @@ impl<T> App<T> {
 
         #[cfg(debug_assertions)]
         let mut last_style_reload = Instant::now();
-
         while !self.windows.is_empty() {
             let time_start = Instant::now();
 
             let glium_window_id_to_window_id = self
                 .windows
                 .iter()
-                .map(|(window_id, window)| (window.display.gl_window().id(), *window_id))
+                .map(|(window_id, window)| {
+                    let id = window.display.gl_window().window().id();
+                    (id, *window_id)
+                })
                 .collect::<BTreeMap<GliumWindowId, WindowId>>();
 
             let mut events = BTreeMap::new();
 
-            self.fake_display
-                .hidden_events_loop
-                .poll_events(|e| match e {
+            // FIXME: probably should use `run` instead
+            // See warnings at https://docs.rs/winit/0.20.0-alpha3/winit/platform/desktop/trait.EventLoopExtDesktop.html
+            self.fake_display.hidden_events_loop.run_return(|e, _, cf| {
+                match e {
                     // Filter out all events that are uninteresting or unnecessary
                     // Event::WindowEvent { event: WindowEvent::Refresh, .. } => { },
                     Event::WindowEvent { window_id, event } => {
                         if let Some(wid) = glium_window_id_to_window_id.get(&window_id) {
                             events.entry(wid).or_insert_with(|| Vec::new()).push(event);
+                            *cf = ControlFlow::Exit;
                         }
                     }
-                    _ => {}
-                });
-
+                    _ => *cf = ControlFlow::Wait,
+                }
+            });
             let mut closed_windows = Vec::<WindowId>::new();
             let mut frame_was_resize = false;
             let mut single_window_results = Vec::with_capacity(self.windows.len());
@@ -367,12 +374,14 @@ impl<T> App<T> {
                     &mut window,
                     self.window_states
                         .get_mut(current_window_id)
-                        .ok_or(WindowIndexError)?,
+                        .ok_or(WindowIndexError)
+                        .expect("do better"),
                     &mut self.app_state,
                     &mut self.fake_display,
                     &mut ui_state_cache,
                     &mut awakened_tasks,
-                )?;
+                )
+                .expect("do better");
 
                 if single_window_result.needs_relayout_resize {
                     frame_was_resize = true;
@@ -438,7 +447,8 @@ impl<T> App<T> {
                             current_window_id,
                             None,
                             self.layout_callback,
-                        )?,
+                        )
+                        .expect("do better"),
                         Some(s) => {
                             println!("{}", s);
                             ui_state_from_dom(
@@ -455,7 +465,8 @@ impl<T> App<T> {
                     ui_state_map.insert(rendered_dom.dom_id.clone(), rendered_dom);
                     *ui_state_cache
                         .get_mut(current_window_id)
-                        .ok_or(WindowIndexError)? = ui_state_map;
+                        .ok_or(WindowIndexError)
+                        .expect("do better") = ui_state_map;
 
                     relayout_single_window(
                         &current_window_id,
@@ -466,7 +477,8 @@ impl<T> App<T> {
                         &mut ui_state_cache,
                         &mut ui_description_cache,
                         &mut awakened_tasks,
-                    )?;
+                    )
+                    .expect("do better")
                 }
             }
 
@@ -474,7 +486,8 @@ impl<T> App<T> {
             for (window_id, full_window_state) in &self.window_states {
                 self.windows
                     .get_mut(&window_id)
-                    .ok_or(WindowIndexError)?
+                    .ok_or(WindowIndexError)
+                    .expect("do better")
                     .state = ::window::full_window_state_to_window_state(full_window_state);
             }
 
@@ -531,7 +544,6 @@ impl<T> App<T> {
                 }
             }
         }
-
         Ok(())
     }
 }
@@ -811,23 +823,6 @@ fn hit_test_single_window<T>(
 
     ret.should_scroll_render = should_scroll_render;
 
-    // See: https://docs.rs/glutin/0.19.0/glutin/struct.CombinedContext.html#method.resize
-    //
-    // Some platforms (macOS, Wayland) require being manually updated when their window
-    // or surface is resized.
-    #[cfg(not(target_os = "windows"))]
-    {
-        if frame_event_info.is_resize_event {
-            // Resize gl window
-            let gl_window = window.display.gl_window();
-            let size = gl_window
-                .get_inner_size()
-                .unwrap()
-                .to_physical(gl_window.get_hidpi_factor());
-            gl_window.resize(size);
-        }
-    }
-
     // Update the FullWindowState that we got from the frame event (updates window dimensions and DPI)
     full_window_state.pending_focus_target = ret.new_focus_target.clone();
 
@@ -835,14 +830,14 @@ fn hit_test_single_window<T>(
     window::synchronize_window_state_with_os_window(
         full_window_state,
         &mut app_state.windows.get_mut(window_id).unwrap().state,
-        &*window.display.gl_window(),
+        &*window.display.gl_window().window(),
     );
 
     window::update_from_external_window_state(
         full_window_state,
         &mut frame_event_info,
         &fake_display.hidden_events_loop,
-        &window.display.gl_window(),
+        &window.display.gl_window().window(),
     );
 
     app_state.windows.get_mut(window_id).unwrap().state =
@@ -1179,7 +1174,6 @@ fn update_display_list<T>(
         display_list_from_ui_description, display_list_to_cached_display_list,
         CachedDisplayListResult,
     };
-    use glium::glutin::ContextTrait;
     use wr_translate::{wr_translate_display_list, wr_translate_pipeline_id};
 
     let display_list = display_list_from_ui_description(ui_description, ui_state);
@@ -1187,7 +1181,7 @@ fn update_display_list<T>(
     // Make sure unused scroll states are garbage collected.
     window.internal.scroll_states.remove_unused_scroll_states();
 
-    unsafe { window.display.gl_window().make_current().unwrap() };
+    unsafe { window.make_current() };
 
     DomId::reset();
 
@@ -1207,13 +1201,7 @@ fn update_display_list<T>(
         &mut fake_display.render_api,
     );
 
-    unsafe {
-        fake_display
-            .hidden_display
-            .gl_window()
-            .make_current()
-            .unwrap()
-    };
+    unsafe { fake_display.make_current() };
 
     for (_dom_id, image_resource_updates) in image_resource_updates {
         add_resources(
@@ -1375,7 +1363,6 @@ fn render_inner<T>(
     background_color: ColorU,
 ) {
     use azul_css::ColorF;
-    use glium::glutin::ContextTrait;
     use webrender::api::{DeviceIntPoint, DeviceIntRect};
     use wr_translate;
 
@@ -1422,11 +1409,7 @@ fn render_inner<T>(
         // The context **must** be made current before calling `.bind_framebuffer()`,
         // otherwise EGL will panic with EGL_BAD_MATCH. The current context has to be the
         // hidden_display context, otherwise this will segfault on Windows.
-        fake_display
-            .hidden_display
-            .gl_window()
-            .make_current()
-            .unwrap();
+        fake_display.make_current();
 
         let mut current_program = [0_i32];
         gl_context.get_integer_v(gl::CURRENT_PROGRAM, &mut current_program);
@@ -1511,15 +1494,11 @@ fn render_inner<T>(
 
         // FBOs can't be shared between windows, but textures can.
         // In order to draw on the windows backbuffer, first make the window current, then draw to FB 0
-        window.display.gl_window().make_current().unwrap();
+        window.make_current();
         draw_texture_to_screen(gl_context.clone(), textures[0], framebuffer_size);
         window.display.swap_buffers().unwrap();
 
-        fake_display
-            .hidden_display
-            .gl_window()
-            .make_current()
-            .unwrap();
+        fake_display.make_current();
 
         // Only delete the texture here...
         gl_context.delete_framebuffers(&framebuffers);
@@ -1534,7 +1513,7 @@ fn render_inner<T>(
     // The initial setup can lead to flickering during startup, by default
     // the window is hidden until the first frame has been rendered.
     if window.create_options.state.is_visible && window.state.is_visible {
-        window.display.gl_window().window().show();
+        window.display.gl_window().window().set_visible(true);
         window.state.is_visible = true;
         window.create_options.state.is_visible = false;
     }

@@ -27,7 +27,9 @@ use azul_css::{
     LayoutRect as CssLayoutRect, LayoutSideOffsets as CssLayoutSideOffsets, LayoutSize,
     LayoutSize as CssLayoutSize,
 };
-use glium::glutin::{MouseCursor as WinitCursorType, VirtualKeyCode as WinitVirtualKeyCode};
+use glium::glutin::{
+    event::VirtualKeyCode as WinitVirtualKeyCode, window::CursorIcon as WinitCursorType,
+};
 use webrender::api::{
     AlphaType as WrAlphaType, BorderRadius as WrBorderRadius, BorderSide as WrBorderSide,
     BorderStyle as WrBorderStyle, BoxShadowClipMode as WrBoxShadowClipMode,

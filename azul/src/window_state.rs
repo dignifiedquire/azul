@@ -4,8 +4,8 @@ pub use azul_core::window::{
     PhysicalPosition, PhysicalSize, WaylandTheme, WindowSize, WindowState,
 };
 use glium::glutin::{
-    dpi::LogicalPosition as WinitLogicalPosition, ElementState, KeyboardInput, ModifiersState,
-    MouseScrollDelta, WindowEvent,
+    dpi::LogicalPosition as WinitLogicalPosition,
+    event::{ElementState, KeyboardInput, ModifiersState, MouseScrollDelta, WindowEvent},
 };
 use std::{
     collections::{BTreeMap, HashSet},
@@ -52,7 +52,7 @@ pub(crate) mod winit_translate {
     }
 
     use azul_core::window::MouseCursorType;
-    use glium::glutin::MouseCursor as WinitMouseCursorType;
+    use glium::glutin::window::CursorIcon as WinitMouseCursorType;
 
     pub(crate) fn translate_mouse_cursor_type(
         mouse_cursor_type: MouseCursorType,
@@ -987,7 +987,7 @@ fn get_window_events(
     window_state: &mut FullWindowState,
     event: &WindowEvent,
 ) -> HashSet<WindowEventFilter> {
-    use glium::glutin::MouseButton::*;
+    use glium::glutin::event::MouseButton::*;
 
     let mut events_vec = HashSet::<WindowEventFilter>::new();
 

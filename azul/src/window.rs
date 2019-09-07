@@ -10,13 +10,14 @@ use azul_css::HotReloadHandler;
 use azul_css::{ColorU, Css, LayoutPoint, LayoutRect};
 use clipboard2::{Clipboard as _, ClipboardError, SystemClipboard};
 use gleam::gl::{self, Gl};
-pub use glium::glutin::AvailableMonitorsIter;
+pub use glium::glutin::monitor::AvailableMonitorsIter;
 use glium::{
     backend::glutin::DisplayCreationError,
     debug::DebugCallbackBehavior,
     glutin::{
-        Context, ContextBuilder, ContextError, ContextTrait, CreationError, EventsLoop, MonitorId,
-        Window as GliumWindow, WindowBuilder as GliumWindowBuilder, WindowedContext,
+        event_loop::EventLoop, monitor::MonitorHandle, window::Window as GliumWindow,
+        window::WindowBuilder as GliumWindowBuilder, Context, ContextBuilder, ContextCurrentState,
+        ContextError, CreationError, NotCurrent, PossiblyCurrent, WindowedContext,
     },
     Display, IncompatibleOpenGl, SwapBuffersError,
 };
@@ -173,51 +174,12 @@ impl RenderNotifier for Notifier {
 }
 
 /// Select on which monitor the window should pop up.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
 pub enum WindowMonitorTarget {
     /// Window should appear on the primary monitor
     Primary,
     /// Use `Window::get_available_monitors()` to select the correct monitor
-    Custom(MonitorId),
-}
-
-#[cfg(target_os = "linux")]
-type NativeMonitorId = u32;
-// HMONITOR, (*mut c_void), casted to a usize
-#[cfg(target_os = "windows")]
-type NativeMonitorId = usize;
-#[cfg(target_os = "macos")]
-type NativeMonitorId = u32;
-
-impl WindowMonitorTarget {
-    fn get_native_id(&self) -> Option<NativeMonitorId> {
-        use self::WindowMonitorTarget::*;
-
-        #[cfg(target_os = "macos")]
-        use glium::glutin::os::macos::MonitorIdExt;
-        #[cfg(target_os = "linux")]
-        use glium::glutin::os::unix::MonitorIdExt;
-        #[cfg(target_os = "windows")]
-        use glium::glutin::os::windows::MonitorIdExt;
-
-        match self {
-            Primary => None,
-            Custom(m) => Some({
-                #[cfg(target_os = "windows")]
-                {
-                    m.hmonitor() as usize
-                }
-                #[cfg(target_os = "linux")]
-                {
-                    m.native_id()
-                }
-                #[cfg(target_os = "macos")]
-                {
-                    m.native_id()
-                }
-            }),
-        }
-    }
+    Custom(MonitorHandle),
 }
 
 impl ::std::hash::Hash for WindowMonitorTarget {
@@ -230,29 +192,12 @@ impl ::std::hash::Hash for WindowMonitorTarget {
             Primary => 0,
             Custom(_) => 1,
         });
-        state.write_usize(self.get_native_id().unwrap_or(0) as usize);
+        match self {
+            Primary => {}
+            Custom(n) => state.write(n.name().unwrap_or_default().as_bytes()),
+        }
     }
 }
-
-impl PartialEq for WindowMonitorTarget {
-    fn eq(&self, rhs: &Self) -> bool {
-        self.get_native_id() == rhs.get_native_id()
-    }
-}
-
-impl PartialOrd for WindowMonitorTarget {
-    fn partial_cmp(&self, other: &Self) -> Option<::std::cmp::Ordering> {
-        Some((self.get_native_id()).cmp(&(other.get_native_id())))
-    }
-}
-
-impl Ord for WindowMonitorTarget {
-    fn cmp(&self, other: &Self) -> ::std::cmp::Ordering {
-        (self.get_native_id()).cmp(&(other.get_native_id()))
-    }
-}
-
-impl Eq for WindowMonitorTarget {}
 
 impl Default for WindowMonitorTarget {
     fn default() -> Self {
@@ -458,10 +403,10 @@ impl WindowInternal {
 
 impl<T> Window<T> {
     /// Creates a new window
-    pub(crate) fn new(
+    pub(crate) fn new<S: ContextCurrentState>(
         render_api: &mut RenderApi,
-        shared_context: &Context,
-        events_loop: &EventsLoop,
+        shared_context: &Context<S>,
+        events_loop: &EventLoop<()>,
         options: WindowCreateOptions,
         mut css: Css,
         background_color: ColorU,
@@ -471,9 +416,9 @@ impl<T> Window<T> {
         // NOTE: It would be OK to use &RenderApi here, but it's better
         // to make sure that the RenderApi is currently not in use by anything else.
 
-        // NOTE: Creating a new EventsLoop for the new window causes a segfault.
+        // NOTE: Creating a new EventLoop for the new window causes a segfault.
         // Report this to the winit developers.
-        // let events_loop = EventsLoop::new();
+        // let events_loop = EventLoop::new();
 
         let is_transparent_background = background_color.a != 0;
 
@@ -481,9 +426,8 @@ impl<T> Window<T> {
             .with_title(options.state.title.clone())
             .with_maximized(options.state.is_maximized)
             .with_decorations(options.state.has_decorations)
-            .with_visibility(false)
-            .with_transparency(is_transparent_background)
-            .with_multitouch();
+            .with_visible(false)
+            .with_transparent(is_transparent_background);
 
         // TODO: Update winit to have:
         //      .with_always_on_top(options.state.is_always_on_top)
@@ -512,19 +456,19 @@ impl<T> Window<T> {
 
         if let Some(min_dim) = options.state.size.min_dimensions {
             // TODO: reverse logical size!
-            window = window.with_min_dimensions(winit_translate::translate_logical_size(min_dim));
+            window = window.with_min_inner_size(winit_translate::translate_logical_size(min_dim));
         }
 
         if let Some(max_dim) = options.state.size.max_dimensions {
             // TODO: reverse logical size!
-            window = window.with_max_dimensions(winit_translate::translate_logical_size(max_dim));
+            window = window.with_max_inner_size(winit_translate::translate_logical_size(max_dim));
         }
 
         // Only create a context with VSync and SRGB if the context creation works
-        let gl_window = create_gl_window(window, &events_loop, Some(shared_context))?;
+        let gl_window = create_gl_window_with_shared(window, &events_loop, shared_context)?;
 
         // Hide the window until the first draw (prevents flash on startup)
-        gl_window.hide();
+        gl_window.window().set_visible(false);
 
         let (hidpi_factor, winit_hidpi_factor) =
             get_hidpi_factor(&gl_window.window(), &events_loop);
@@ -534,16 +478,19 @@ impl<T> Window<T> {
         state.size.winit_hidpi_factor = winit_hidpi_factor;
 
         if options.state.is_fullscreen {
+            use glium::glutin::window::Fullscreen;
             gl_window
                 .window()
-                .set_fullscreen(Some(gl_window.window().get_current_monitor()));
+                .set_fullscreen(Some(Fullscreen::Borderless(
+                    gl_window.window().current_monitor(),
+                )));
         }
 
         if let Some(pos) = options.state.position {
             // TODO: reverse logical size!
             gl_window
                 .window()
-                .set_position(winit_translate::translate_logical_position(pos));
+                .set_outer_position(winit_translate::translate_logical_position(pos));
         }
 
         if options.state.is_maximized && !options.state.is_fullscreen {
@@ -562,7 +509,7 @@ impl<T> Window<T> {
         let display = Display::with_debug(gl_window, DebugCallbackBehavior::Ignore)?;
 
         let framebuffer_size = {
-            let inner_logical_size = display.gl_window().get_inner_size().unwrap();
+            let inner_logical_size = display.gl_window().window().inner_size();
             let (width, height): (u32, u32) =
                 inner_logical_size.to_physical(hidpi_factor as f64).into();
             DeviceIntSize::new(width as i32, height as i32)
@@ -613,10 +560,10 @@ impl<T> Window<T> {
     /// Creates a new window that will automatically load a new style from a given HotReloadHandler.
     /// Only available with debug_assertions enabled.
     #[cfg(debug_assertions)]
-    pub(crate) fn new_hot_reload(
+    pub(crate) fn new_hot_reload<S: ContextCurrentState>(
         render_api: &mut RenderApi,
-        shared_context: &Context,
-        events_loop: &EventsLoop,
+        shared_context: &Context<S>,
+        events_loop: &EventLoop<()>,
         options: WindowCreateOptions,
         css_loader: Box<dyn HotReloadHandler>,
         background_color: ColorU,
@@ -633,14 +580,12 @@ impl<T> Window<T> {
         Ok(window)
     }
 
-    /// Returns an iterator over all given monitors
-    pub fn get_available_monitors() -> AvailableMonitorsIter {
-        EventsLoop::new().get_available_monitors()
-    }
+    pub unsafe fn make_current(&self) {
+        // use glium::backend::Backend;
+        // use std::borrow::BorrowMut;
+        // use takeable_option::Takeable;
 
-    /// Returns what monitor the window is currently residing on (to query monitor size, etc.).
-    pub fn get_current_monitor(&self) -> MonitorId {
-        self.display.gl_window().window().get_current_monitor()
+        // self.display.make_current();
     }
 }
 
@@ -683,8 +628,9 @@ pub(crate) fn synchronize_window_state_with_os_window(
     }
 
     if old_state.is_fullscreen != new_state.is_fullscreen {
+        use glium::glutin::window::Fullscreen;
         if new_state.is_fullscreen {
-            window.set_fullscreen(Some(window.get_current_monitor()));
+            window.set_fullscreen(Some(Fullscreen::Borderless(window.current_monitor())));
         } else {
             window.set_fullscreen(None);
         }
@@ -696,14 +642,14 @@ pub(crate) fn synchronize_window_state_with_os_window(
 
     if old_state.is_visible != new_state.is_visible {
         if new_state.is_visible {
-            window.show();
+            window.set_visible(true);
         } else {
-            window.hide();
+            window.set_visible(false);
         }
     }
 
     if old_state.size.min_dimensions != new_state.size.min_dimensions {
-        window.set_min_dimensions(
+        window.set_min_inner_size(
             new_state
                 .size
                 .min_dimensions
@@ -712,7 +658,7 @@ pub(crate) fn synchronize_window_state_with_os_window(
     }
 
     if old_state.size.max_dimensions != new_state.size.max_dimensions {
-        window.set_max_dimensions(
+        window.set_max_inner_size(
             new_state
                 .size
                 .max_dimensions
@@ -756,15 +702,15 @@ fn synchronize_mouse_state(
         new_mouse_state.mouse_cursor_type,
     ) {
         (Some(_old_mouse_cursor), None) => {
-            window.hide_cursor(true);
+            window.set_cursor_visible(false);
         }
         (None, Some(new_mouse_cursor)) => {
-            window.hide_cursor(false);
-            window.set_cursor(winit_translate_cursor(new_mouse_cursor));
+            window.set_cursor_visible(true);
+            window.set_cursor_icon(winit_translate_cursor(new_mouse_cursor));
         }
         (Some(old_mouse_cursor), Some(new_mouse_cursor)) => {
             if old_mouse_cursor != new_mouse_cursor {
-                window.set_cursor(winit_translate_cursor(new_mouse_cursor));
+                window.set_cursor_icon(winit_translate_cursor(new_mouse_cursor));
             }
         }
         (None, None) => {}
@@ -772,7 +718,7 @@ fn synchronize_mouse_state(
 
     if old_mouse_state.is_cursor_locked != new_mouse_state.is_cursor_locked {
         window
-            .grab_cursor(new_mouse_state.is_cursor_locked)
+            .set_cursor_grab(new_mouse_state.is_cursor_locked)
             .map_err(|e| {
                 if cfg!(feature = "logging") {
                     warn!("{}", e);
@@ -810,7 +756,7 @@ pub(crate) fn full_window_state_to_window_state(
 pub(crate) fn update_from_external_window_state(
     window_state: &mut FullWindowState,
     frame_event_info: &FrameEventInfo,
-    events_loop: &EventsLoop,
+    events_loop: &EventLoop<()>,
     window: &GliumWindow,
 ) {
     #[cfg(target_os = "linux")]
@@ -856,7 +802,7 @@ pub(crate) struct FakeDisplay {
     pub(crate) hidden_display: Display,
     /// TODO: Not sure if we even need this, the events loop isn't important
     /// for a window that is never shown
-    pub(crate) hidden_events_loop: EventsLoop,
+    pub(crate) hidden_events_loop: EventLoop<()>,
     /// Stores the GL context that is shared across all windows
     pub(crate) gl_context: Rc<dyn Gl>,
 }
@@ -864,18 +810,18 @@ pub(crate) struct FakeDisplay {
 impl FakeDisplay {
     /// Creates a new render + a new display, given a renderer type (software or hardware)
     pub(crate) fn new(renderer_type: RendererType) -> Result<Self, WindowCreateError> {
-        let events_loop = EventsLoop::new();
+        let events_loop = EventLoop::new();
         let window = GliumWindowBuilder::new()
-            .with_dimensions(winit_translate::translate_logical_size(LogicalSize::new(
+            .with_inner_size(winit_translate::translate_logical_size(LogicalSize::new(
                 10.0, 10.0,
             )))
-            .with_visibility(false);
+            .with_visible(false);
 
-        let gl_window = create_gl_window(window, &events_loop, None)?;
+        let gl_window = create_gl_window(window, &events_loop)?;
         let (dpi_factor, _) = get_hidpi_factor(&gl_window.window(), &events_loop);
-        gl_window.hide();
+        gl_window.window().set_visible(false);
 
-        unsafe { gl_window.make_current().unwrap() };
+        let gl_window = unsafe { gl_window.make_current().unwrap() };
         let gl = get_gl_context(&gl_window)?;
         let display = Display::with_debug(gl_window, DebugCallbackBehavior::Ignore)?;
 
@@ -886,7 +832,9 @@ impl FakeDisplay {
 
         renderer.set_external_image_handler(Box::new(Compositor::default()));
 
-        fn get_gl_context(gl_window: &WindowedContext) -> Result<Rc<dyn Gl>, WindowCreateError> {
+        fn get_gl_context(
+            gl_window: &WindowedContext<PossiblyCurrent>,
+        ) -> Result<Rc<dyn Gl>, WindowCreateError> {
             use glium::glutin::Api;
             match gl_window.get_api() {
                 Api::OpenGl => Ok(unsafe {
@@ -911,23 +859,23 @@ impl FakeDisplay {
     pub fn get_gl_context(&self) -> Rc<dyn Gl> {
         self.gl_context.clone()
     }
+
+    pub unsafe fn make_current(&self) {
+        // TODO: Is Display robust enough that we don't actually need this?
+        // use std::borrow::BorrowMut;
+        // use takeable_option::Takeable;
+
+        // let mut gl_window_takeable = self.hidden_display.gl_window().borrow_mut();
+        // let gl_window = Takeable::take(&mut gl_window_takeable);
+        // let gl_window = gl_window.make_current().unwrap();
+        // Takeable::insert(&mut gl_window_takeable, gl_window);
+    }
 }
 
 impl Drop for FakeDisplay {
     fn drop(&mut self) {
         // NOTE: For some reason this is necessary, otherwise the renderer crashes on shutdown
-        //
-        // TODO: This still crashes on Linux because the makeCurrent call doesn't succeed
-        // (likely because the underlying surface has been destroyed). In those cases,
-        // we don't de-initialize the rendered (since this is an application shutdown it
-        // doesn't matter, the resources are going to get cleaned up by the OS).
-        match unsafe { self.hidden_display.gl_window().make_current() } {
-            Ok(_) => {}
-            Err(e) => {
-                error!("Shutdown error: {}", e);
-                return;
-            }
-        }
+        unsafe { self.make_current() };
 
         self.gl_context.disable(gl::FRAMEBUFFER_SRGB);
         self.gl_context.disable(gl::MULTISAMPLE);
@@ -941,9 +889,9 @@ impl Drop for FakeDisplay {
 
 /// Returns the actual hidpi factor and the winit DPI factor for the current window
 #[allow(unused_variables)]
-fn get_hidpi_factor(window: &GliumWindow, events_loop: &EventsLoop) -> (f32, f32) {
-    let monitor = window.get_current_monitor();
-    let winit_hidpi_factor = monitor.get_hidpi_factor();
+fn get_hidpi_factor(window: &GliumWindow, events_loop: &EventLoop<()>) -> (f32, f32) {
+    let monitor = window.current_monitor();
+    let winit_hidpi_factor = monitor.hidpi_factor();
 
     #[cfg(target_os = "linux")]
     {
@@ -960,42 +908,54 @@ fn get_hidpi_factor(window: &GliumWindow, events_loop: &EventsLoop) -> (f32, f32
 
 fn create_gl_window(
     window: GliumWindowBuilder,
-    events_loop: &EventsLoop,
-    shared_context: Option<&Context>,
-) -> Result<WindowedContext, WindowCreateError> {
+    events_loop: &EventLoop<()>,
+) -> Result<WindowedContext<NotCurrent>, WindowCreateError> {
     // The shared_context is reversed: If the shared_context is None, then this window is the root window,
     // so the window should be created with new_shared (so the context can be shared to all other windows).
     //
     // If the shared_context is Some() then the window is not a root window, so it should share the existing
     // context, but not re-share it (so, create it normally via ::new() instead of ::new_shared()).
 
-    WindowedContext::new_windowed(
-        window.clone(),
-        create_context_builder(true, true, shared_context),
-        &events_loop,
-    )
-    .or_else(|_| {
-        WindowedContext::new_windowed(
-            window.clone(),
-            create_context_builder(true, false, shared_context),
-            &events_loop,
-        )
-    })
-    .or_else(|_| {
-        WindowedContext::new_windowed(
-            window.clone(),
-            create_context_builder(false, true, shared_context),
-            &events_loop,
-        )
-    })
-    .or_else(|_| {
-        WindowedContext::new_windowed(
-            window.clone(),
-            create_context_builder(false, false, shared_context),
-            &events_loop,
-        )
-    })
-    .map_err(|e| WindowCreateError::CreateError(e))
+    create_context_builder(true, true)
+        .build_windowed(window.clone(), &events_loop)
+        .or_else(|_| {
+            create_context_builder(true, false).build_windowed(window.clone(), &events_loop)
+        })
+        .or_else(|_| {
+            create_context_builder(false, true).build_windowed(window.clone(), &events_loop)
+        })
+        .or_else(|_| {
+            create_context_builder(false, false).build_windowed(window.clone(), &events_loop)
+        })
+        .map_err(|e| WindowCreateError::CreateError(e))
+}
+
+fn create_gl_window_with_shared<T: ContextCurrentState>(
+    window: GliumWindowBuilder,
+    events_loop: &EventLoop<()>,
+    shared_context: &Context<T>,
+) -> Result<WindowedContext<NotCurrent>, WindowCreateError> {
+    // The shared_context is reversed: If the shared_context is None, then this window is the root window,
+    // so the window should be created with new_shared (so the context can be shared to all other windows).
+    //
+    // If the shared_context is Some() then the window is not a root window, so it should share the existing
+    // context, but not re-share it (so, create it normally via ::new() instead of ::new_shared()).
+
+    create_context_builder_with_shared(true, true, shared_context)
+        .build_windowed(window.clone(), &events_loop)
+        .or_else(|_| {
+            create_context_builder_with_shared(true, false, shared_context)
+                .build_windowed(window.clone(), &events_loop)
+        })
+        .or_else(|_| {
+            create_context_builder_with_shared(false, true, shared_context)
+                .build_windowed(window.clone(), &events_loop)
+        })
+        .or_else(|_| {
+            create_context_builder_with_shared(false, false, shared_context)
+                .build_windowed(window.clone(), &events_loop)
+        })
+        .map_err(|e| WindowCreateError::CreateError(e))
 }
 
 /// ContextBuilder is sadly not clone-able, which is why it has to be re-created
@@ -1008,19 +968,50 @@ fn create_gl_window(
 /// `allow_sharing_context` should only be true for the root window - so that
 /// we can be sure the shared context can't be re-shared by the created window. Only
 /// the root window (via `FakeDisplay`) is allowed to manage the OpenGL context.
-fn create_context_builder<'a>(
-    vsync: bool,
-    srgb: bool,
-    shared_context: Option<&'a Context>,
-) -> ContextBuilder<'a> {
+fn create_context_builder<'a>(vsync: bool, srgb: bool) -> ContextBuilder<'a, NotCurrent> {
     // See #33 - specifying a specific OpenGL version
     // makes winit crash on older Intel drivers, which is why we
     // don't specify a specific OpenGL version here
     let mut builder = ContextBuilder::new();
 
-    if let Some(shared_context) = shared_context {
-        builder = builder.with_shared_lists(shared_context);
+    // #[cfg(debug_assertions)] {
+    //     builder = builder.with_gl_debug_flag(true);
+    // }
+
+    // #[cfg(not(debug_assertions))] {
+    builder = builder.with_gl_debug_flag(false);
+    // }
+
+    if vsync {
+        builder = builder.with_vsync(true);
     }
+
+    if srgb {
+        builder = builder.with_srgb(true);
+    }
+
+    builder
+}
+
+/// ContextBuilder is sadly not clone-able, which is why it has to be re-created
+/// every time you want to create a new context. The goals is to not crash on
+/// platforms that don't have VSync or SRGB (which are OpenGL extensions) installed.
+///
+/// Secondly, in order to support multi-window apps, all windows need to share
+/// the same OpenGL context - i.e. `builder.with_shared_lists(some_gl_window.context());`
+///
+/// `allow_sharing_context` should only be true for the root window - so that
+/// we can be sure the shared context can't be re-shared by the created window. Only
+/// the root window (via `FakeDisplay`) is allowed to manage the OpenGL context.
+fn create_context_builder_with_shared<'a, T: ContextCurrentState>(
+    vsync: bool,
+    srgb: bool,
+    shared_context: &'a Context<T>,
+) -> ContextBuilder<'a, T> {
+    // See #33 - specifying a specific OpenGL version
+    // makes winit crash on older Intel drivers, which is why we
+    // don't specify a specific OpenGL version here
+    let mut builder = ContextBuilder::new().with_shared_lists(shared_context);
 
     // #[cfg(debug_assertions)] {
     //     builder = builder.with_gl_debug_flag(true);
@@ -1143,8 +1134,8 @@ fn get_xft_dpi() -> Option<f32> {
 
 /// Return the DPI on X11 systems
 #[cfg(target_os = "linux")]
-fn linux_get_hidpi_factor(monitor: &MonitorId, events_loop: &EventsLoop) -> f32 {
-    use glium::glutin::os::unix::EventsLoopExt;
+fn linux_get_hidpi_factor(monitor: &MonitorId, events_loop: &EventLoop) -> f32 {
+    use glium::glutin::os::unix::EventLoopExt;
     use std::env;
     use std::process::Command;
 
