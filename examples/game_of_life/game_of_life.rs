@@ -5,7 +5,14 @@ extern crate azul;
 use azul::{prelude::*, widgets::button::Button};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-macro_rules! CSS_PATH {() => { concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/game_of_life/game_of_life.css")};}
+macro_rules! CSS_PATH {
+    () => {
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../examples/game_of_life/game_of_life.css"
+        )
+    };
+}
 
 const CSS: &str = include_str!(CSS_PATH!());
 const INITIAL_UNIVERSE_WIDTH: usize = 75;
@@ -29,7 +36,9 @@ enum Cell {
 }
 
 impl Cell {
-    pub fn is_alive(&self) -> bool { *self == Cell::Alive }
+    pub fn is_alive(&self) -> bool {
+        *self == Cell::Alive
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -46,9 +55,7 @@ struct Board {
 }
 
 impl Layout for Universe {
-
     fn layout(&self, _info: LayoutInfo<Self>) -> Dom<Self> {
-
         let (dead_cells, alive_cells) = count_dead_and_alive_cells(&self.board.cells);
 
         let header = Dom::div()
@@ -57,9 +64,14 @@ impl Layout for Universe {
             .with_child(Dom::label(format!("{} Alive Cells", alive_cells)).with_id("alive_count"))
             .with_child(Dom::label(format!("{} Dead Cells", dead_cells)).with_id("dead_count"))
             .with_child(
-                Button::with_label(if !self.game_is_running { "Start" } else { "Restart" }).dom()
+                Button::with_label(if !self.game_is_running {
+                    "Start"
+                } else {
+                    "Restart"
+                })
+                .dom()
                 .with_id("start_btn")
-                .with_callback(On::MouseUp, start_stop_game)
+                .with_callback(On::MouseUp, start_stop_game),
             );
 
         Dom::new(NodeType::Div)
@@ -71,13 +83,15 @@ impl Layout for Universe {
 /// Returns the number of (dead, alive) cells
 fn count_dead_and_alive_cells(cells: &[Vec<Cell>]) -> (usize, usize) {
     let total_cells: usize = cells.iter().map(|row| row.len()).sum();
-    let alive_cells = cells.iter().map(|row| row.iter().filter(|c| c.is_alive()).count()).sum();
+    let alive_cells = cells
+        .iter()
+        .map(|row| row.iter().filter(|c| c.is_alive()).count())
+        .sum();
     let dead_cells = total_cells - alive_cells;
     (dead_cells, alive_cells)
 }
 
 impl Board {
-
     pub fn empty(board_width: usize, board_height: usize) -> Self {
         Self {
             cells: vec![vec![Cell::Dead; board_width]; board_height],
@@ -87,14 +101,15 @@ impl Board {
     }
 
     pub fn new_random(board_width: usize, board_height: usize) -> Self {
-
-        let cells = (0..board_height).map(|_| {
-            (0..board_width)
-            // Initial cell has 1 in 4 chance of being alive
-            .map(|_| rand_xorshift() % 4 == 0)
-            .map(|alive| if alive { Cell::Alive } else { Cell::Dead })
-            .collect()
-        }).collect();
+        let cells = (0..board_height)
+            .map(|_| {
+                (0..board_width)
+                    // Initial cell has 1 in 4 chance of being alive
+                    .map(|_| rand_xorshift() % 4 == 0)
+                    .map(|alive| if alive { Cell::Alive } else { Cell::Dead })
+                    .collect()
+            })
+            .collect();
 
         Self {
             cells,
@@ -105,16 +120,20 @@ impl Board {
 
     /// Render the board in a table-like grid structure
     pub fn dom<T: Layout>(&self) -> Dom<T> {
-        self.cells.iter().map(|row| {
-            row.iter().map(|c|
-                NodeData::div()
-                .with_classes(vec![match c {
-                    Cell::Alive => "alive_cell".into(),
-                    Cell::Dead => "dead_cell".into(),
-                }])
-            ).collect::<Dom<T>>()
-            .with_class("row")
-        }).collect()
+        self.cells
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|c| {
+                        NodeData::div().with_classes(vec![match c {
+                            Cell::Alive => "alive_cell".into(),
+                            Cell::Dead => "dead_cell".into(),
+                        }])
+                    })
+                    .collect::<Dom<T>>()
+                    .with_class("row")
+            })
+            .collect()
     }
 }
 
@@ -125,19 +144,32 @@ fn tick(event: TimerCallbackInfo<Universe>) -> (UpdateScreen, TerminateTimer) {
 }
 
 fn next_iteration(input: &Board) -> Board {
-
     let mut new_board = input.clone();
 
     for (row_idx, row) in new_board.cells.iter_mut().enumerate() {
-
-        let upper_r = if row_idx == 0 { input.vertical_cells - 1 } else { row_idx - 1 };
-        let lower_r = if row_idx == input.vertical_cells - 1 { 0 } else { row_idx + 1 };
+        let upper_r = if row_idx == 0 {
+            input.vertical_cells - 1
+        } else {
+            row_idx - 1
+        };
+        let lower_r = if row_idx == input.vertical_cells - 1 {
+            0
+        } else {
+            row_idx + 1
+        };
 
         for (cell_idx, cell) in row.iter_mut().enumerate() {
-
             // Select all neighbours of the current cell (the 8 cells surrounding the current cell)
-            let left_c = if cell_idx == 0 { input.horizontal_cells - 1 } else { cell_idx - 1 };
-            let right_c = if cell_idx == input.horizontal_cells - 1 { 0 } else { cell_idx + 1 };
+            let left_c = if cell_idx == 0 {
+                input.horizontal_cells - 1
+            } else {
+                cell_idx - 1
+            };
+            let right_c = if cell_idx == input.horizontal_cells - 1 {
+                0
+            } else {
+                cell_idx + 1
+            };
 
             let neighbors = [
                 &input.cells[upper_r][left_c],
@@ -147,7 +179,7 @@ fn next_iteration(input: &Board) -> Board {
                 &input.cells[row_idx][right_c],
                 &input.cells[lower_r][left_c],
                 &input.cells[lower_r][cell_idx],
-                &input.cells[lower_r][right_c]
+                &input.cells[lower_r][right_c],
             ];
 
             let alive_neighbors = neighbors.iter().filter(|c| c.is_alive()).count();
@@ -156,7 +188,11 @@ fn next_iteration(input: &Board) -> Board {
                 Cell::Dead => alive_neighbors == 3,
             };
 
-            *cell = if is_cell_alive { Cell::Alive } else { Cell::Dead };
+            *cell = if is_cell_alive {
+                Cell::Alive
+            } else {
+                Cell::Dead
+            };
         }
     }
 
@@ -165,7 +201,6 @@ fn next_iteration(input: &Board) -> Board {
 
 /// Callback that starts the main
 fn start_stop_game(event: CallbackInfo<Universe>) -> UpdateScreen {
-
     use std::time::Duration;
 
     if let Some(timer) = {
@@ -180,7 +215,7 @@ fn start_stop_game(event: CallbackInfo<Universe>) -> UpdateScreen {
             state.game_is_running = true;
             Some(timer)
         }
-    }{
+    } {
         event.state.add_timer(TimerId::new(), timer);
     }
 
@@ -188,11 +223,14 @@ fn start_stop_game(event: CallbackInfo<Universe>) -> UpdateScreen {
 }
 
 fn main() {
-
-    let mut app = App::new(Universe {
-        board: Board::empty(INITIAL_UNIVERSE_WIDTH, INITIAL_UNIVERSE_HEIGHT),
-        game_is_running: false,
-    }, AppConfig::default()).unwrap();
+    let mut app = App::new(
+        Universe {
+            board: Board::empty(INITIAL_UNIVERSE_WIDTH, INITIAL_UNIVERSE_HEIGHT),
+            game_is_running: false,
+        },
+        AppConfig::default(),
+    )
+    .unwrap();
 
     let mut window_options = WindowCreateOptions::default();
     window_options.state.title = "Game of Life".into();

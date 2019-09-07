@@ -5,7 +5,11 @@ extern crate azul;
 use azul::prelude::*;
 use std::time::Duration;
 
-macro_rules! CSS_PATH { () => (concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/slider/slider.css")) }
+macro_rules! CSS_PATH {
+    () => {
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../examples/slider/slider.css")
+    };
+}
 
 #[derive(Default)]
 struct DragMeApp {
@@ -17,7 +21,6 @@ type Event<'a, 'b> = CallbackInfo<'a, 'b, DragMeApp>;
 
 impl Layout for DragMeApp {
     fn layout(&self, _: LayoutInfo<DragMeApp>) -> Dom<Self> {
-
         let mut left = Dom::new(NodeType::Div).with_id("blue");
 
         // Set the width of the dragger on the red element
@@ -29,21 +32,20 @@ impl Layout for DragMeApp {
 
         // The dragger is 0px wide, but has an absolutely positioned rectangle
         // inside of it, which can be dragged
-        let dragger =
-            Dom::div()
-            .with_id("dragger")
-            .with_child(
+        let dragger = Dom::div().with_id("dragger").with_child(
+            Dom::div().with_id("dragger_handle_container").with_child(
                 Dom::div()
-                .with_id("dragger_handle_container")
-                .with_child(
-                    Dom::div()
                     .with_id("dragger_handle")
                     .with_callback(On::MouseDown, start_drag)
-                    .with_callback(EventFilter::Not(NotEventFilter::Hover(HoverEventFilter::MouseDown)), click_outside_drag)
-                )
-            );
+                    .with_callback(
+                        EventFilter::Not(NotEventFilter::Hover(HoverEventFilter::MouseDown)),
+                        click_outside_drag,
+                    ),
+            ),
+        );
 
-        Dom::new(NodeType::Div).with_id("container")
+        Dom::new(NodeType::Div)
+            .with_id("container")
             .with_callback(On::MouseOver, update_drag)
             .with_callback(On::MouseUp, stop_drag)
             .with_child(left)
@@ -68,7 +70,13 @@ fn stop_drag(event: Event) -> UpdateScreen {
 }
 
 fn update_drag(event: Event) -> UpdateScreen {
-    let cursor_pos = event.window().state.mouse_state.cursor_pos.get_position().unwrap_or(LogicalPosition::new(0.0, 0.0));
+    let cursor_pos = event
+        .window()
+        .state
+        .mouse_state
+        .cursor_pos
+        .get_position()
+        .unwrap_or(LogicalPosition::new(0.0, 0.0));
     if event.state.data.is_dragging {
         event.state.data.width = Some(cursor_pos.x as f32);
         Redraw
@@ -78,19 +86,20 @@ fn update_drag(event: Event) -> UpdateScreen {
 }
 
 fn main() {
-
     let mut app = App::new(DragMeApp::default(), AppConfig::default()).unwrap();
 
     #[cfg(debug_assertions)]
     let window = {
         let hot_reloader = css::hot_reload(CSS_PATH!(), Duration::from_millis(500));
-        app.create_hot_reload_window(WindowCreateOptions::default(), hot_reloader).unwrap()
+        app.create_hot_reload_window(WindowCreateOptions::default(), hot_reloader)
+            .unwrap()
     };
 
     #[cfg(not(debug_assertions))]
     let window = {
         let css = css::from_str(include_str!(CSS_PATH!())).unwrap();
-        app.create_window(WindowCreateOptions::default(), css).unwrap()
+        app.create_window(WindowCreateOptions::default(), css)
+            .unwrap()
     };
 
     app.run(window).unwrap();

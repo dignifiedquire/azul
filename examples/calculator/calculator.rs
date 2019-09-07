@@ -4,8 +4,22 @@ extern crate azul;
 
 use azul::prelude::*;
 
-macro_rules! CSS_PATH {() => { concat!(env!("CARGO_MANIFEST_DIR"), "/../../examples/calculator/calculator.css")};}
-macro_rules! FONT_PATH {() => { concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/fonts/KoHo-Light.ttf")};}
+macro_rules! CSS_PATH {
+    () => {
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../examples/calculator/calculator.css"
+        )
+    };
+}
+macro_rules! FONT_PATH {
+    () => {
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../assets/fonts/KoHo-Light.ttf"
+        )
+    };
+}
 
 const FONT: &[u8] = include_bytes!(FONT_PATH!());
 
@@ -31,7 +45,6 @@ enum Event {
     Dot,
     Number(u8),
 }
-
 
 impl Layout for Calculator {
     fn layout(&self, _info: LayoutInfo<Self>) -> Dom<Self> {
@@ -59,8 +72,14 @@ impl Layout for Calculator {
                             .with_child(numpad_btn("=", "orange")),
                     ),
             )
-            .with_callback(EventFilter::Window(WindowEventFilter::TextInput), handle_text_input)
-            .with_callback(EventFilter::Window(WindowEventFilter::VirtualKeyDown), handle_virtual_key_input)
+            .with_callback(
+                EventFilter::Window(WindowEventFilter::TextInput),
+                handle_text_input,
+            )
+            .with_callback(
+                EventFilter::Window(WindowEventFilter::VirtualKeyDown),
+                handle_virtual_key_input,
+            )
     }
 }
 
@@ -148,14 +167,19 @@ impl OperandStack {
         }
 
         // Iterate the stack until the first Dot is found
-        let first_dot_position = self.stack.iter()
+        let first_dot_position = self
+            .stack
+            .iter()
             .position(|x| *x == Number::Dot)
             .and_then(|x| Some(x - 1))
             .unwrap_or(stack_size - 1) as i32;
 
         let mut final_number = 0.0;
 
-        for (number_position, number) in self.stack.iter().filter_map(|x| match x {
+        for (number_position, number) in self
+            .stack
+            .iter()
+            .filter_map(|x| match x {
                 Number::Dot => None,
                 Number::Value(v) => Some(v),
             })
@@ -174,12 +198,14 @@ impl OperandStack {
 }
 
 fn handle_mouseclick_numpad_btn(info: CallbackInfo<Calculator>) -> UpdateScreen {
-
     // Figure out which row and column was clicked...
     let (clicked_col_idx, clicked_row_idx) = {
         let mut row_iter = info.parent_nodes();
         row_iter.next()?;
-        (info.target_index_in_parent()?, row_iter.current_index_in_parent()?)
+        (
+            info.target_index_in_parent()?,
+            row_iter.current_index_in_parent()?,
+        )
     };
 
     // Figure out what button was clicked from the given row and column, filter bad events
@@ -216,7 +242,9 @@ fn handle_mouseclick_numpad_btn(info: CallbackInfo<Calculator>) -> UpdateScreen 
 }
 
 fn handle_text_input(info: CallbackInfo<Calculator>) -> UpdateScreen {
-    let CallbackInfo { state, window_id, .. } = info;
+    let CallbackInfo {
+        state, window_id, ..
+    } = info;
     let current_key = state.windows[window_id].state.keyboard_state.current_char?;
     let event = match current_key {
         '0' => Event::Number(0),
@@ -243,8 +271,13 @@ fn handle_text_input(info: CallbackInfo<Calculator>) -> UpdateScreen {
 }
 
 fn handle_virtual_key_input(info: CallbackInfo<Calculator>) -> UpdateScreen {
-    let CallbackInfo { state, window_id, .. } = info;
-    let current_key = state.windows[window_id].state.keyboard_state.latest_virtual_keycode?;
+    let CallbackInfo {
+        state, window_id, ..
+    } = info;
+    let current_key = state.windows[window_id]
+        .state
+        .keyboard_state
+        .latest_virtual_keycode?;
     let event = match current_key {
         VirtualKeyCode::Return => Event::EqualSign,
         VirtualKeyCode::Back => Event::Clear,
@@ -254,7 +287,6 @@ fn handle_virtual_key_input(info: CallbackInfo<Calculator>) -> UpdateScreen {
 }
 
 fn process_event(app_state: &mut AppState<Calculator>, event: Event) -> UpdateScreen {
-
     // Act on the event accordingly
     match event {
         Event::Clear => {
@@ -263,12 +295,12 @@ fn process_event(app_state: &mut AppState<Calculator>, event: Event) -> UpdateSc
         }
         Event::InvertSign => {
             if !app_state.data.division_by_zero {
-                app_state.data.current_operand_stack.negative_number = !app_state.data.current_operand_stack.negative_number;
+                app_state.data.current_operand_stack.negative_number =
+                    !app_state.data.current_operand_stack.negative_number;
             }
             Redraw
         }
         Event::Percent => {
-
             if app_state.data.division_by_zero {
                 return DontRedraw;
             }
@@ -298,7 +330,9 @@ fn process_event(app_state: &mut AppState<Calculator>, event: Event) -> UpdateSc
             if let Some(Event::EqualSign) = state.last_event {
                 state.expression = format!("{} =", state.current_operand_stack.get_display());
             } else {
-                state.expression.push_str(&format!("{} =", state.current_operand_stack.get_display()));
+                state
+                    .expression
+                    .push_str(&format!("{} =", state.current_operand_stack.get_display()));
                 if let Some(operation) = &state.last_event.clone() {
                     if let Some(operand) = state.current_operator.clone() {
                         let num = state.current_operand_stack.get_number();
@@ -323,7 +357,13 @@ fn process_event(app_state: &mut AppState<Calculator>, event: Event) -> UpdateSc
                 return DontRedraw;
             }
 
-            if state.current_operand_stack.stack.iter().position(|x| *x == Number::Dot).is_none() {
+            if state
+                .current_operand_stack
+                .stack
+                .iter()
+                .position(|x| *x == Number::Dot)
+                .is_none()
+            {
                 if state.current_operand_stack.stack.len() == 0 {
                     state.current_operand_stack.stack.push(Number::Value(0));
                 }
@@ -336,7 +376,11 @@ fn process_event(app_state: &mut AppState<Calculator>, event: Event) -> UpdateSc
             if let Some(Event::EqualSign) = app_state.data.last_event {
                 app_state.data = Calculator::default();
             }
-            app_state.data.current_operand_stack.stack.push(Number::Value(v));
+            app_state
+                .data
+                .current_operand_stack
+                .stack
+                .push(Number::Value(v));
             Redraw
         }
         operation => {
@@ -350,7 +394,9 @@ fn process_event(app_state: &mut AppState<Calculator>, event: Event) -> UpdateSc
                 state.expression = String::new();
             }
 
-            state.expression.push_str(&state.current_operand_stack.get_display());
+            state
+                .expression
+                .push_str(&state.current_operand_stack.get_display());
 
             if let Some(Event::EqualSign) = state.last_event {
                 state.current_operator = Some(state.current_operand_stack.clone());
@@ -388,28 +434,38 @@ fn perform_operation(left_operand: f32, operation: &Event, right_operand: f32) -
         Event::Multiply => Some(left_operand * right_operand),
         Event::Subtract => Some(left_operand - right_operand),
         Event::Plus => Some(left_operand + right_operand),
-        Event::Divide => if right_operand == 0.0 {
+        Event::Divide => {
+            if right_operand == 0.0 {
                 None
-            }
-			else {
+            } else {
                 Some(left_operand / right_operand)
-        },
+            }
+        }
         _ => unreachable!(),
     }
 }
 
 fn main() {
-
     let css = css::override_native(include_str!(CSS_PATH!())).unwrap();
 
     let mut app = App::new(Calculator::default(), AppConfig::default()).unwrap();
     let font_id = app.app_state.resources.add_css_font_id("KoHo-Light");
-    app.app_state.resources.add_font_source(font_id, FontSource::Embedded(FONT));
+    app.app_state
+        .resources
+        .add_font_source(font_id, FontSource::Embedded(FONT));
 
-    let window = app.create_window(WindowCreateOptions::default(), css.clone()).unwrap();
-    let window2 = app.create_window(WindowCreateOptions::default(), css.clone()).unwrap();
-    let window3 = app.create_window(WindowCreateOptions::default(), css.clone()).unwrap();
-    let window4 = app.create_window(WindowCreateOptions::default(), css.clone()).unwrap();
+    let window = app
+        .create_window(WindowCreateOptions::default(), css.clone())
+        .unwrap();
+    let window2 = app
+        .create_window(WindowCreateOptions::default(), css.clone())
+        .unwrap();
+    let window3 = app
+        .create_window(WindowCreateOptions::default(), css.clone())
+        .unwrap();
+    let window4 = app
+        .create_window(WindowCreateOptions::default(), css.clone())
+        .unwrap();
     app.add_window(window2);
     app.add_window(window3);
     app.add_window(window4);

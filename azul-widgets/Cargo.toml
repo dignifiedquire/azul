@@ -1,0 +1,64 @@
+[package]
+name = "azul-widgets"
+version = "0.1.0"
+authors = ["Felix Schütt <felix.schuett@maps4print.com>"]
+license = "MIT"
+description = '''
+    Builtin widgets for the Azul GUI framework (buttons, checkboxes, labels, etc.)
+'''
+documentation = "https://docs.rs/azul-widgets"
+homepage = "https://azul.rs/"
+keywords = ["gui", "GUI", "user interface"]
+categories = ["gui"]
+repository = "https://github.com/maps4print/azul"
+readme = "README.md"
+exclude = ["../assets/*", "../doc/*", "../examples/*"]
+autoexamples = false
+
+[dependencies]
+azul-core               = { version = "0.1.0",                  path = "../azul-core"                             }
+azul-css                = { version = "0.1.0",                  path = "../azul-css"                              }
+gleam                   = { version = "0.6",                    optional = true                                   }
+serde_derive            = { version = "1",                    optional = true }
+serde                   = { version = "1",                    optional = true }
+glium                   = { version = "0.24",                 default-features = false, features = ["glutin"] }
+euclid                  = { version = "0.19.4",                default-features = false }
+rusttype                = { version = "0.7.3",                default-features = false }
+app_units               = { version = "0.7.1",               default-features = false }
+unicode-normalization   = { version = "0.1.7",   default-features = false }
+lazy_static             = { version = "1.2.0",             default-features = false }
+tinyfiledialogs         = { version = "3.3.5",    default-features = false }
+clipboard2              = { version = "0.1.1",              default-features = false }
+font-loader             = { version = "0.8.0",     default-features = false }
+xmlparser               = { version = "0.6.1",               default-features = false }
+harfbuzz-sys            = { version = "0.3.0" }
+log                     = { version = "0.4.6",                     default-features = false, optional = true }
+stb_truetype            = { version = "0.2.2",            default-features = false, optional = true }
+fern                    = { version = "0.5.7",                    default-features = false, optional = true }
+backtrace               = { version = "0.3.12",             default-features = false, optional = true, features = ["std", "libunwind", "libbacktrace", "coresymbolication", "dladdr", "dbghelp"] }
+lyon                    = { version = "0.11.0",                  default-features = false, optional = true }
+usvg                    = { version = "0.3.0",                    default-features = false, optional = true }
+image                   = { version = "0.20.1",                 default-features = false, optional = true, features = ["gif_codec", "jpeg", "png_codec", "pnm", "tiff", "bmp"] }
+
+# Linux: Use webrender with freetype feature enabled
+[target.'cfg(target_os = "linux")'.dependencies]
+webrender = { version = "0.58.0" } # rev = "92235d1fc4ff4c4fb4e1ed709eb3136e96c786b5"
+
+# Windows: Use nativefiledialog because of better Unicode support for file browsers
+# TODO: Unicode problems have been fixed upstream, update azul to tinyfiledialogs!
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+# nfd = { version = "0.0.4", path = "./nfd-0.0.4", default-features = false }
+webrender = { version = "0.58.0", default-features = false }
+
+[features]
+default = []
+# The SVG rendering module is pretty huge since it needs lyon - if you don't use
+# SVG rendering in your app, you can turn this off to increase compilation
+# speed and decrease your binary size
+svg = ["lyon", "stb_truetype", "gleam"]
+# This is for activating **parsing** of SVG files. If you, for example, just
+# want to draw shapes on the screen, you do not need to activate this feature,
+# this is just for parsing the SVG from a file.
+svg_parsing = ["svg", "usvg"]
+# For serializing / deserializing CSS colors using serde
+serde_serialization = ["serde_derive", "serde"]

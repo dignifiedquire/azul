@@ -33,7 +33,7 @@ struct TestCrudApp {
 impl Default for TestCrudApp {
     fn default() -> Self {
         Self {
-            text_input: TextInputState::new("Hover mouse over rectangle and press keys")
+            text_input: TextInputState::new("Hover mouse over rectangle and press keys"),
         }
     }
 }
@@ -41,15 +41,17 @@ impl Default for TestCrudApp {
 impl Layout for TestCrudApp {
     fn layout(&self, info: LayoutInfo<Self>) -> Dom<Self> {
         TextInput::new()
-        .bind(info.window, &self.text_input, &self)
-        .dom(&self.text_input)
-        .with_id("text_input_1")
+            .bind(info.window, &self.text_input, &self)
+            .dom(&self.text_input)
+            .with_id("text_input_1")
     }
 }
 
 fn main() {
     let mut app = App::new(TestCrudApp::default(), AppConfig::default()).unwrap();
     let css = css::override_native(CSS).unwrap();
-    let window = app.create_window(WindowCreateOptions::default(), css).unwrap();
+    let window = app
+        .create_window(WindowCreateOptions::default(), css)
+        .unwrap();
     app.run(window).unwrap();
 }
