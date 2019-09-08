@@ -19,7 +19,9 @@ edition = "2018"
 [dependencies]
 azul-css                = { path = "../azul-css",   default-features = false }
 azul-simplecss          = { version = "0.1.1",      default-features = false }
-serde                   = { version = "1",          default-features = false, optional = true }
+
+# These are fixed to match webrender_api
+serde = { version = "=1.0.80", optional = true }
 
 [features]
 default = []

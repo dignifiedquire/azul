@@ -30,7 +30,6 @@ gleam = "0.6"
 glium = { version = "0.26.0-alpha3", default-features = false, features = ["glutin"] }
 
 euclid = { version = "0.19.4", default-features = false }
-rusttype = { version = "0.7.3", default-features = false }
 app_units = { version = "0.7.1", default-features = false }
 unicode-normalization = { version = "0.1.7", default-features = false }
 lazy_static = { version = "1.2.0", default-features = false }
@@ -40,9 +39,9 @@ font-loader = { version = "0.8.0", default-features = false }
 xmlparser = { version = "0.6.1", default-features = false }
 harfbuzz-sys = "0.3.0"
 
-
-serde_derive = { version = "1.0.0", optional = true }
-serde = { version = "1.0.0", optional = true }
+# These are fixed to match webrender_api
+serde_derive = { version = "=1.0.80", optional = true }
+serde = { version = "=1.0.80", optional = true }
 
 log = { version = "0.4.6", default-features = false, optional = true }
 stb_truetype = { version = "0.2.2", default-features = false, optional = true }

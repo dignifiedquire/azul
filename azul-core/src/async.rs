@@ -277,7 +277,6 @@ impl<T> Thread<T> {
     /// # Example
     ///
     /// ```rust
-    /// # extern crate azul_core;
     /// # use azul_core::r#async::Thread;
     /// #
     /// fn pure_function(input: usize) -> usize { input + 1 }

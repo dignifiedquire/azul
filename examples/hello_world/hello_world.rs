@@ -1,5 +1,3 @@
-extern crate azul;
-
 use azul::{
     prelude::*,
     widgets::{button::Button, label::Label},

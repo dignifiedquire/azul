@@ -20,9 +20,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-extern crate azul_core;
-extern crate azul_css;
-
 use crate::style::Style;
 use azul_core::{
     dom::NodeId,

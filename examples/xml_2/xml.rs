@@ -1,5 +1,3 @@
-extern crate azul;
-
 use azul::prelude::*;
 use std::time::Duration;
 

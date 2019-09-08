@@ -10,11 +10,6 @@
 #![deny(missing_copy_implementations)]
 #![allow(unused_variables)]
 
-extern crate azul_css;
-extern crate azul_simplecss;
-#[cfg(feature = "serde_serialization")]
-extern crate serde;
-
 #[macro_use]
 mod macros;
 

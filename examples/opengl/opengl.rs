@@ -1,6 +1,3 @@
-extern crate azul;
-extern crate gleam;
-
 use azul::prelude::*;
 use azul::widgets::button::Button;
 use gleam::gl;

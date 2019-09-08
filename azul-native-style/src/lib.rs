@@ -1,9 +1,6 @@
 //! Provides azul-compatible approximations of OS-native styles.
 
-extern crate azul_css;
 use azul_css::Css;
-
-extern crate azul_css_parser;
 
 /// CSS mimicking the OS-native look - Windows: `styles/native_windows.css`
 #[cfg(target_os = "windows")]

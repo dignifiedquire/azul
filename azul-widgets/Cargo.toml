@@ -19,9 +19,12 @@ edition = "2018"
 [dependencies]
 azul-core               = { version = "0.1.0",                  path = "../azul-core"                             }
 azul-css                = { version = "0.1.0",                  path = "../azul-css"                              }
-gleam                   = { version = "0.6",                    optional = true                                   }
-serde_derive            = { version = "1",                    optional = true }
-serde                   = { version = "1",                    optional = true }
+gleam = { version = "0.6", optional = true }
+
+# These are fixed to match webrender_api
+serde_derive = { version = "=1.0.80", optional = true }
+serde = { version = "=1.0.80", optional = true }
+
 stb_truetype            = { version = "0.2.2",            default-features = false, optional = true }
 lyon                    = { version = "0.11.0",                  default-features = false, optional = true }
 usvg                    = { version = "0.3.0",                    default-features = false, optional = true }

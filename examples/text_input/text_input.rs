@@ -1,7 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-extern crate azul;
-
 use azul::prelude::*;
 use azul::widgets::text_input::*;
 
